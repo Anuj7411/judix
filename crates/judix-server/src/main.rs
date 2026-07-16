@@ -1,34 +1,101 @@
-//! Judix HTTP server (portable axum + tokio). Day-1 scope: `GET /health` so we
-//! have a live public URL first (blueprint §11.1). Scoring routes + SSE land
-//! Day 1.3 / Day 2.
+//! Judix HTTP server (portable axum + tokio). Deployed as a Docker image on any
+//! container host (Render / Koyeb / Fly / HF Spaces). Binds `$PORT`.
 //!
-//! Deployed as a Docker image on any container host (Koyeb / Render / Fly / etc).
-//! Binds `$PORT` (hosts inject it). The router is built by [`build_app`] so route
-//! logic stays independent of the entrypoint.
+//! Routes:
+//!   GET  /health        liveness probe (also hit by the keep-warm ping)
+//!   GET  /              service info
+//!   POST /score/agent   deterministic agent-trajectory scoring (no key needed)
+//!   POST /score/rag     RAG scoring (needs the model layer — stubbed until key)
+//!   GET  /demo/:id      built-in demo fixtures (clean|wrong_tool|rag_hallucination)
 
-use axum::{routing::get, Json, Router};
+use axum::{
+    extract::Path,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
+use judix_core::scoring::score_agent;
+use judix_core::types::AgentTrace;
 use serde_json::{json, Value};
+
+// Demo fixtures embedded at compile time so `/demo/:id` works in the slim runtime
+// image (which doesn't ship the `demos/` directory).
+const DEMO_CLEAN: &str = include_str!("../../../demos/clean.json");
+const DEMO_WRONG_TOOL: &str = include_str!("../../../demos/wrong_tool.json");
+const DEMO_RAG: &str = include_str!("../../../demos/rag_hallucination.json");
 
 /// Build the application router. Kept separate from `main` for reuse and testing.
 pub fn build_app() -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/", get(root))
+        .route("/score/agent", post(score_agent_handler))
+        .route("/score/rag", post(score_rag_handler))
+        .route("/demo/{id}", get(demo_handler))
 }
 
-/// Liveness probe. Deployed first so there is a reachable URL from hour one, and
-/// hit by the keep-warm ping to prevent free-tier scale-to-zero.
 async fn health() -> Json<Value> {
     Json(json!({ "ok": true, "service": "judix", "version": env!("CARGO_PKG_VERSION") }))
 }
 
-/// Placeholder root until the web UI ships (Day 2, §11.5).
 async fn root() -> Json<Value> {
     Json(json!({
         "service": "judix",
         "tagline": "Real-time, per-turn evaluation for AI agents & RAG. A deterministic Rust engine scores; a model only explains.",
-        "endpoints": ["/health", "/score/agent (soon)", "/score/rag (soon)", "/demo/:id (soon)"]
+        "endpoints": {
+            "GET /health": "liveness",
+            "POST /score/agent": "score an agent trace (deterministic; model explanations when JUDIX_API_KEY is set)",
+            "POST /score/rag": "score a RAG triple (requires the model layer)",
+            "GET /demo/:id": "clean | wrong_tool | rag_hallucination"
+        }
     }))
+}
+
+/// Score an agent trace. The deterministic metrics (tool-call F1, loop detection)
+/// are computed with zero model calls; `step_relevance`/`goal_drift` will be added
+/// by the model layer once `JUDIX_API_KEY` is configured (Day 1.3).
+async fn score_agent_handler(Json(trace): Json<AgentTrace>) -> impl IntoResponse {
+    // No model metrics yet — deterministic-first. `deterministic_share` will read
+    // 100% until the model layer is wired in.
+    let report = score_agent(&trace, &[], 0, 0.0);
+    (StatusCode::OK, Json(json!(report)))
+}
+
+/// RAG scoring is model-dependent (claim decomposition + verification), so until
+/// the model layer ships this returns a clear, honest `model_required` signal
+/// rather than fabricating a score.
+async fn score_rag_handler(Json(_triple): Json<Value>) -> impl IntoResponse {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({
+            "status": "model_required",
+            "message": "RAG faithfulness needs the model layer (claim decomposition + verification). Set JUDIX_API_KEY to enable it."
+        })),
+    )
+}
+
+/// Serve a built-in demo fixture so the playground can one-click load examples.
+async fn demo_handler(Path(id): Path<String>) -> impl IntoResponse {
+    let body = match id.as_str() {
+        "clean" => DEMO_CLEAN,
+        "wrong_tool" => DEMO_WRONG_TOOL,
+        "rag_hallucination" => DEMO_RAG,
+        _ => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "unknown demo id", "valid": ["clean", "wrong_tool", "rag_hallucination"] })),
+            )
+        }
+    };
+    // The fixtures are valid JSON; parse so we return application/json, not text.
+    match serde_json::from_str::<Value>(body) {
+        Ok(v) => (StatusCode::OK, Json(v)),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("demo parse error: {e}") })),
+        ),
+    }
 }
 
 #[tokio::main]
@@ -40,7 +107,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    // Container hosts inject $PORT; default to 8000 for local dev.
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
