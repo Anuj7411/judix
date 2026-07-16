@@ -4,17 +4,17 @@
 FROM rust:1-slim-bookworm AS builder
 WORKDIR /app
 
-# Build only what the server needs (deterministic engine + axum). The optional
-# `model` feature (reqwest/moka) stays off until the model layer ships.
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+
 COPY Cargo.toml Cargo.lock* ./
 COPY crates ./crates
 COPY demos ./demos
+COPY web ./web
 RUN cargo build --release -p judix-server
 
 FROM debian:bookworm-slim
-# ca-certificates so outbound HTTPS to the model API (Groq) works.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/judix-server /usr/local/bin/judix-server
 # Hosts inject $PORT (Render sets it); the server reads $PORT at runtime, so the

@@ -9,7 +9,8 @@ name = "judix-server"
 path = "src/main.rs"
 
 [dependencies]
-judix-core = { path = "../judix-core" }
+judix-core = { path = "../judix-core", features = ["model"] }
+serde = { workspace = true }
 axum = "0.8"
 tokio = { workspace = true }
 serde_json = { workspace = true }

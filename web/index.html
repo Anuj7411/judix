@@ -68,12 +68,22 @@
       red:   { text:'text-red-300', bg:'bg-red-900/30', border:'border-red-700/60', num:'text-red-400' },
     }[band] || { text:'text-slate-300', bg:'bg-slate-800/40', border:'border-slate-700', num:'text-slate-300' });
 
-    const chip = (label, val, pass) => {
-      const ok = pass === true, bad = pass === false;
+    const chip = (m) => {
+      const isModel = m.source === 'model';
+      const label = m.name === 'tool_call_correctness' ? 'tool-call F1'
+                  : m.name === 'loop_free' ? (m.raw_value > 0 ? `loop-free · repeat ×${Math.round(m.raw_value)}` : 'loop-free')
+                  : m.name === 'step_relevance' ? 'relevance'
+                  : m.name === 'goal_drift' ? 'goal-drift'
+                  : m.name;
+      const val = m.name === 'tool_call_correctness' ? (m.raw_value).toFixed(2) : Math.round(m.score);
+      const ok = m.pass === true, bad = m.pass === false;
       const mark = ok ? '<span class="text-emerald-400">✓</span>' : bad ? '<span class="text-red-400">✗ fail</span>' : '';
-      const cls = bad ? 'border-red-800/60 bg-red-950/30' : 'border-slate-700 bg-slate-900/50';
+      const badge = isModel ? '<span class="text-indigo-400">ai</span>' : '<span class="text-slate-500">cpu</span>';
+      const cls = bad ? 'border-red-800/60 bg-red-950/30'
+                : isModel ? 'border-indigo-800/60 bg-indigo-950/30'
+                : 'border-slate-700 bg-slate-900/50';
       return `<span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border ${cls}">
-        <span class="text-slate-500">cpu</span> ${label} <b class="text-slate-100">${val}</b> ${mark}</span>`;
+        ${badge} ${label} <b class="text-slate-100">${val}</b> ${mark}</span>`;
     };
 
     function renderAgent(report) {
@@ -101,13 +111,7 @@
           return;
         }
         const sb = bandColor(s.band);
-        const chips = s.metrics.filter(m=>!m.na).map(m => {
-          const label = m.name === 'tool_call_correctness' ? 'tool-call F1'
-                      : m.name === 'loop_free' ? (m.raw_value>0 ? `loop-free · repeat ×${Math.round(m.raw_value)}` : 'loop-free')
-                      : m.name;
-          const val = m.name === 'tool_call_correctness' ? (m.raw_value).toFixed(2) : Math.round(m.score);
-          return chip(label, val, m.pass);
-        }).join(' ');
+        const chips = s.metrics.filter(m=>!m.na).map(m => chip(m)).join(' ');
         html += `
           <div class="border-t border-slate-800 py-3">
             <div class="flex items-center gap-3">
@@ -116,11 +120,20 @@
               <span class="ml-auto text-xs px-2 py-0.5 rounded ${sb.bg} ${sb.text} border ${sb.border}">step ${Math.round(s.step_quality)} · ${s.band}</span>
             </div>
             <div class="flex gap-2 flex-wrap mt-2 pl-9">${chips}</div>
-            <div class="pl-9 mt-2 text-xs text-slate-500 flex items-start gap-2">
-              <span>msg</span>
-              <span><span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/60">model · coming</span>
-              relevance &amp; goal-drift explanation appears here once a Groq key is set.</span>
-            </div>
+            ${(() => {
+              const modelMetrics = s.metrics.filter(m => m.source === 'model' && !m.na && m.reason);
+              if (modelMetrics.length > 0) {
+                return `<div class="pl-9 mt-2 text-xs text-slate-400 space-y-1">${modelMetrics.map(m =>
+                  `<div class="flex items-start gap-2">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/60 shrink-0">${m.name === 'step_relevance' ? 'relevance' : 'goal-drift'}</span>
+                    <span>${m.reason}</span>
+                  </div>`).join('')}</div>`;
+              }
+              return `<div class="pl-9 mt-2 text-xs text-slate-500 flex items-start gap-2">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/60 text-slate-500 border border-slate-700/60">model</span>
+                <span>relevance &amp; goal-drift explanations appear when OmniRoute is connected.</span>
+              </div>`;
+            })()}
           </div>`;
       });
       results.innerHTML = html;
@@ -136,17 +149,77 @@
       renderAgent(report);
     }
 
-    async function scoreRag(triple) {
-      status.textContent = 'scoring…';
-      const res = await fetch('/score/rag', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(triple) });
-      const body = await res.json().catch(()=>({}));
-      status.textContent = res.status === 501 ? 'RAG needs the model layer' : `status ${res.status}`;
-      results.innerHTML = `
-        <div class="rounded-xl border border-amber-700/60 bg-amber-900/20 p-4 text-sm text-amber-200">
-          <b>RAG faithfulness is model-powered.</b> The deterministic engine handles agent trajectories at $0;
-          RAG scoring (claim decomposition + grounding) lights up once a free Groq key is configured.
-          <div class="mt-2 text-xs text-amber-300/80 mono">${body.message || ''}</div>
+    function renderRag(report) {
+      const b = bandColor(report.band);
+      const q = Math.round(report.rag_quality);
+      let html = `
+        <div class="rounded-xl border ${b.border} ${b.bg} p-4 mb-4 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="text-xs uppercase tracking-wide text-slate-400">RAG quality</div>
+            <div class="text-4xl font-semibold ${b.num} leading-none mt-1">${q}<span class="text-base text-slate-500">/100</span></div>
+            <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded ${b.bg} ${b.text} border ${b.border}">${report.band}</span>
+          </div>
+          <div class="text-xs text-slate-400 space-y-1 text-right">
+            <div>${report.latency_ms} ms</div>
+          </div>
         </div>`;
+
+      // Metric chips
+      const metricChips = report.metrics.filter(m => !m.na).map(m => chip(m)).join(' ');
+      if (metricChips) {
+        html += `<div class="flex gap-2 flex-wrap mb-4">${metricChips}</div>`;
+      }
+
+      // Metric reasons
+      report.metrics.filter(m => !m.na && m.reason).forEach(m => {
+        html += `<div class="text-xs text-slate-400 mb-2 flex items-start gap-2">
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/60 shrink-0">${m.name}</span>
+          <span>${m.reason}</span>
+        </div>`;
+      });
+
+      // Claim spans — highlight unsupported in red
+      if (report.unsupported_spans && report.unsupported_spans.length > 0) {
+        html += `<div class="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+          <div class="text-xs uppercase tracking-wide text-slate-500 mb-2">Claims</div>
+          <div class="space-y-2">`;
+        report.unsupported_spans.forEach(span => {
+          const ok = span.supported;
+          const icon = ok ? '<span class="text-emerald-400">✓</span>' : '<span class="text-red-400">✗</span>';
+          const cls = ok ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-200' : 'border-red-800/40 bg-red-950/20 text-red-200';
+          html += `<div class="text-sm px-3 py-2 rounded border ${cls} flex items-start gap-2">
+            ${icon} <span>${span.text}</span>
+          </div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      results.innerHTML = html;
+    }
+
+    async function scoreRag(triple) {
+      status.textContent = 'scoring… (model calls may take a moment)';
+      const t0 = performance.now();
+      const res = await fetch('/score/rag', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(triple) });
+      if (res.status === 501) {
+        const body = await res.json().catch(() => ({}));
+        status.textContent = 'RAG needs the model layer';
+        results.innerHTML = `
+          <div class="rounded-xl border border-amber-700/60 bg-amber-900/20 p-4 text-sm text-amber-200">
+            <b>RAG faithfulness is model-powered.</b> The deterministic engine handles agent trajectories at $0;
+            RAG scoring lights up once <code>JUDIX_BASE_URL</code> points at OmniRoute.
+            <div class="mt-2 text-xs text-amber-300/80 mono">${body.message || ''}</div>
+          </div>`;
+        return;
+      }
+      if (!res.ok) {
+        status.textContent = `error ${res.status}`;
+        results.innerHTML = `<pre class="text-red-400 text-xs">${await res.text()}</pre>`;
+        return;
+      }
+      const report = await res.json();
+      status.textContent = `done in ${Math.round(performance.now() - t0)} ms (round-trip)`;
+      renderRag(report);
     }
 
     document.querySelectorAll('.demo-btn').forEach(btn => btn.addEventListener('click', async () => {

@@ -8,14 +8,14 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Set your free Groq key here (or in the Render dashboard) to enable the
-      # model-explanation + RAG faithfulness layer. Deterministic scoring works
-      # without it.
+      # Point at your OmniRoute instance to enable model-powered metrics
+      # (step_relevance, goal_drift, RAG faithfulness). Deterministic scoring
+      # works without it.
       - key: JUDIX_BASE_URL
-        value: https://api.groq.com/openai/v1
-      - key: JUDIX_MODEL_FAST
-        value: llama-3.3-70b-versatile
-      - key: JUDIX_MODEL_STRONG
-        value: openai/gpt-oss-120b
+        sync: false
       - key: JUDIX_API_KEY
         sync: false
+      - key: JUDIX_MODEL_FAST
+        value: auto/fast
+      - key: JUDIX_MODEL_STRONG
+        value: auto/reasoning
