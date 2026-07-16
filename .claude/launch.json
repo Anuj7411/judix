@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "judix",
+      "runtimeExecutable": "C:\\Users\\ojhaa\\.cargo\\bin\\cargo.exe",
+      "runtimeArgs": ["run", "--manifest-path", "C:\\Projects\\judix\\Cargo.toml", "-p", "judix-server"],
+      "port": 8000,
+      "autoPort": true,
+      "env": {
+        "PATH": "C:\\Users\\ojhaa\\.cargo\\bin;C:\\Users\\ojhaa\\winlibs\\mingw64\\bin;%PATH%"
+      }
+    }
+  ]
+}

@@ -67,13 +67,13 @@ async fn score_agent_handler(
 ) -> impl IntoResponse {
     let t0 = std::time::Instant::now();
 
-    let model_metrics = match &state.model {
+    let (model_metrics, cost) = match &state.model {
         Some(client) => client.score_agent_steps(&trace).await,
-        None => vec![],
+        None => (vec![], 0.0),
     };
 
     let latency = t0.elapsed().as_millis() as u64;
-    let report = score_agent(&trace, &model_metrics, latency, 0.0);
+    let report = score_agent(&trace, &model_metrics, latency, cost);
     (StatusCode::OK, Json(json!(report)))
 }
 
@@ -96,9 +96,9 @@ async fn score_rag_handler(
 
     let t0 = std::time::Instant::now();
     match client.score_rag_triple(&triple).await {
-        Ok((metrics, spans, any_contradiction)) => {
+        Ok((metrics, spans, cost)) => {
             let latency = t0.elapsed().as_millis() as u64;
-            let report = score_rag(metrics, spans, any_contradiction, latency, 0.0);
+            let report = score_rag(metrics, spans, latency, cost);
             (StatusCode::OK, Json(json!(report)))
         }
         Err(e) => (
