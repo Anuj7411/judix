@@ -17,8 +17,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/judix-server /usr/local/bin/judix-server
-# Hosts inject $PORT (Render etc.); HF Spaces routes to app_port 7860. The server
-# reads $PORT at runtime, so an injected PORT overrides this default.
-ENV PORT=7860
-EXPOSE 7860
+# Hosts inject $PORT (Render sets it); the server reads $PORT at runtime, so the
+# injected value overrides this default. 8000 is only used for local runs.
+ENV PORT=8000
+EXPOSE 8000
 CMD ["judix-server"]

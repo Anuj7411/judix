@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: judix
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Set your free Groq key here (or in the Render dashboard) to enable the
+      # model-explanation + RAG faithfulness layer. Deterministic scoring works
+      # without it.
+      - key: JUDIX_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: JUDIX_MODEL_FAST
+        value: llama-3.3-70b-versatile
+      - key: JUDIX_MODEL_STRONG
+        value: openai/gpt-oss-120b
+      - key: JUDIX_API_KEY
+        sync: false
