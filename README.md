@@ -1,3 +1,14 @@
+---
+title: Judix
+emoji: 🦀
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # Judix
 
 **Real-time, per-turn evaluation for AI agents & RAG. A deterministic Rust engine scores; an AI model only explains.**
