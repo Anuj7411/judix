@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Judix — real-time evaluation for AI agents & RAG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0b0f17; color:#e6e8eb; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    textarea { tab-size: 2; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-4xl mx-auto px-5 py-8">
+    <!-- Header -->
+    <header class="mb-6">
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🦀</span>
+          <div>
+            <h1 class="text-xl font-semibold tracking-tight">Judix</h1>
+            <p class="text-sm text-slate-400">Real-time, per-turn evaluation for AI agents &amp; RAG.</p>
+          </div>
+        </div>
+        <a href="https://github.com/Anuj7411/judix" class="text-sm text-slate-400 hover:text-slate-200 underline">GitHub ↗</a>
+      </div>
+      <p class="mt-3 text-sm text-slate-300 border-l-2 border-indigo-500 pl-3">
+        A <b>deterministic Rust engine</b> computes the scores with <b>zero LLM calls</b> — instant and free.
+        An AI model only <i>explains</i> the why.
+      </p>
+    </header>
+
+    <!-- Controls -->
+    <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-4 mb-5">
+      <div class="flex items-center gap-2 flex-wrap mb-3">
+        <span class="text-xs uppercase tracking-wide text-slate-500 mr-1">Try a demo:</span>
+        <button data-demo="clean" data-kind="agent" class="demo-btn px-3 py-1.5 rounded-lg text-sm border border-emerald-700/60 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-900/40">Clean run</button>
+        <button data-demo="wrong_tool" data-kind="agent" class="demo-btn px-3 py-1.5 rounded-lg text-sm border border-red-700/60 bg-red-900/20 text-red-300 hover:bg-red-900/40">Wrong tool + loop ⚠</button>
+        <button data-demo="rag_hallucination" data-kind="rag" class="demo-btn px-3 py-1.5 rounded-lg text-sm border border-amber-700/60 bg-amber-900/20 text-amber-300 hover:bg-amber-900/40">RAG hallucination</button>
+      </div>
+      <textarea id="input" rows="7" spellcheck="false"
+        class="w-full rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs mono text-slate-200 outline-none focus:border-indigo-600"
+        placeholder='Paste an agent trace as JSON, e.g. {"goal":"...","steps":[...],"expected_tools":[...]}  — or click a demo above.'></textarea>
+      <div class="flex items-center gap-3 mt-3">
+        <button id="scoreBtn" class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white">Score it</button>
+        <span id="status" class="text-sm text-slate-400"></span>
+      </div>
+    </section>
+
+    <!-- Legend -->
+    <div class="flex items-center gap-5 text-xs text-slate-500 mb-4">
+      <span>▮ <span class="text-slate-400">computed by Rust — real, $0</span></span>
+      <span>▮ <span class="text-slate-400">model explanation — needs a key (coming)</span></span>
+    </div>
+
+    <!-- Results -->
+    <section id="results"></section>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const input = $('#input'), status = $('#status'), results = $('#results');
+
+    const bandColor = (band) => ({
+      green: { text:'text-emerald-300', bg:'bg-emerald-900/30', border:'border-emerald-700/60', num:'text-emerald-400' },
+      amber: { text:'text-amber-300', bg:'bg-amber-900/30', border:'border-amber-700/60', num:'text-amber-400' },
+      red:   { text:'text-red-300', bg:'bg-red-900/30', border:'border-red-700/60', num:'text-red-400' },
+    }[band] || { text:'text-slate-300', bg:'bg-slate-800/40', border:'border-slate-700', num:'text-slate-300' });
+
+    const chip = (label, val, pass) => {
+      const ok = pass === true, bad = pass === false;
+      const mark = ok ? '<span class="text-emerald-400">✓</span>' : bad ? '<span class="text-red-400">✗ fail</span>' : '';
+      const cls = bad ? 'border-red-800/60 bg-red-950/30' : 'border-slate-700 bg-slate-900/50';
+      return `<span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border ${cls}">
+        <span class="text-slate-500">cpu</span> ${label} <b class="text-slate-100">${val}</b> ${mark}</span>`;
+    };
+
+    function renderAgent(report) {
+      const b = bandColor(report.band);
+      const q = Math.round(report.run_quality);
+      const det = Math.round(report.deterministic_share * 100);
+      let html = `
+        <div class="rounded-xl border ${b.border} ${b.bg} p-4 mb-4 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div class="text-xs uppercase tracking-wide text-slate-400">Run quality</div>
+            <div class="text-4xl font-semibold ${b.num} leading-none mt-1">${q}<span class="text-base text-slate-500">/100</span></div>
+            <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded ${b.bg} ${b.text} border ${b.border}">${report.band}</span>
+          </div>
+          <div class="text-xs text-slate-400 space-y-1 text-right">
+            <div>${det}% scored by Rust · $${report.model_cost_usd.toFixed(4)}</div>
+            <div>${report.latency_ms} ms</div>
+          </div>
+        </div>`;
+
+      report.steps.forEach((s) => {
+        if (s.na) {
+          html += `<div class="border-t border-slate-800 py-2.5 flex items-center gap-3 text-slate-500 text-sm">
+            <span class="w-6 h-6 rounded-full bg-slate-800 grid place-items-center text-xs">${s.index}</span>
+            <span>${s.label} — model relevance only (coming)</span></div>`;
+          return;
+        }
+        const sb = bandColor(s.band);
+        const chips = s.metrics.filter(m=>!m.na).map(m => {
+          const label = m.name === 'tool_call_correctness' ? 'tool-call F1'
+                      : m.name === 'loop_free' ? (m.raw_value>0 ? `loop-free · repeat ×${Math.round(m.raw_value)}` : 'loop-free')
+                      : m.name;
+          const val = m.name === 'tool_call_correctness' ? (m.raw_value).toFixed(2) : Math.round(m.score);
+          return chip(label, val, m.pass);
+        }).join(' ');
+        html += `
+          <div class="border-t border-slate-800 py-3">
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded-full ${sb.bg} ${sb.text} grid place-items-center text-xs">${s.index}</span>
+              <span class="mono text-sm text-slate-200">${s.label}</span>
+              <span class="ml-auto text-xs px-2 py-0.5 rounded ${sb.bg} ${sb.text} border ${sb.border}">step ${Math.round(s.step_quality)} · ${s.band}</span>
+            </div>
+            <div class="flex gap-2 flex-wrap mt-2 pl-9">${chips}</div>
+            <div class="pl-9 mt-2 text-xs text-slate-500 flex items-start gap-2">
+              <span>msg</span>
+              <span><span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/60">model · coming</span>
+              relevance &amp; goal-drift explanation appears here once a Groq key is set.</span>
+            </div>
+          </div>`;
+      });
+      results.innerHTML = html;
+    }
+
+    async function scoreAgent(trace) {
+      status.textContent = 'scoring…';
+      const t0 = performance.now();
+      const res = await fetch('/score/agent', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(trace) });
+      if (!res.ok) { status.textContent = `error ${res.status}`; results.innerHTML = `<pre class="text-red-400 text-xs">${await res.text()}</pre>`; return; }
+      const report = await res.json();
+      status.textContent = `done in ${Math.round(performance.now()-t0)} ms (round-trip)`;
+      renderAgent(report);
+    }
+
+    async function scoreRag(triple) {
+      status.textContent = 'scoring…';
+      const res = await fetch('/score/rag', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(triple) });
+      const body = await res.json().catch(()=>({}));
+      status.textContent = res.status === 501 ? 'RAG needs the model layer' : `status ${res.status}`;
+      results.innerHTML = `
+        <div class="rounded-xl border border-amber-700/60 bg-amber-900/20 p-4 text-sm text-amber-200">
+          <b>RAG faithfulness is model-powered.</b> The deterministic engine handles agent trajectories at $0;
+          RAG scoring (claim decomposition + grounding) lights up once a free Groq key is configured.
+          <div class="mt-2 text-xs text-amber-300/80 mono">${body.message || ''}</div>
+        </div>`;
+    }
+
+    document.querySelectorAll('.demo-btn').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.dataset.demo, kind = btn.dataset.kind;
+      status.textContent = 'loading demo…';
+      const res = await fetch('/demo/' + id);
+      const data = await res.json();
+      input.value = JSON.stringify(data, null, 2);
+      if (kind === 'rag') scoreRag(data); else scoreAgent(data);
+    }));
+
+    $('#scoreBtn').addEventListener('click', () => {
+      let data;
+      try { data = JSON.parse(input.value); }
+      catch (e) { status.textContent = 'invalid JSON: ' + e.message; return; }
+      if (Array.isArray(data.contexts) && typeof data.answer === 'string') scoreRag(data);
+      else scoreAgent(data);
+    });
+  </script>
+</body>
+</html>

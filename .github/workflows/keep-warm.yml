@@ -1,0 +1,22 @@
+name: keep-warm
+
+# Pings the live Render service every ~10 minutes so it never hits the free-tier
+# 15-minute idle timeout — judges always get an instant response, no cold start.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          URL="https://judix-8piu.onrender.com/health"
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL" || echo "000")
+            if [ "$code" = "200" ]; then echo "warm ($code)"; exit 0; fi
+            echo "attempt $i -> $code, retrying in 15s"; sleep 15
+          done
+          echo "health check failed after retries"; exit 1

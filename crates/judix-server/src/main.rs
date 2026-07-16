@@ -11,7 +11,7 @@
 use axum::{
     extract::Path,
     http::StatusCode,
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
@@ -19,8 +19,9 @@ use judix_core::scoring::score_agent;
 use judix_core::types::AgentTrace;
 use serde_json::{json, Value};
 
-// Demo fixtures embedded at compile time so `/demo/:id` works in the slim runtime
-// image (which doesn't ship the `demos/` directory).
+// Assets embedded at compile time so they work in the slim runtime image (which
+// doesn't ship the source `web/` or `demos/` directories).
+const INDEX_HTML: &str = include_str!("../../../web/index.html");
 const DEMO_CLEAN: &str = include_str!("../../../demos/clean.json");
 const DEMO_WRONG_TOOL: &str = include_str!("../../../demos/wrong_tool.json");
 const DEMO_RAG: &str = include_str!("../../../demos/rag_hallucination.json");
@@ -30,6 +31,7 @@ pub fn build_app() -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/", get(root))
+        .route("/api", get(api_info))
         .route("/score/agent", post(score_agent_handler))
         .route("/score/rag", post(score_rag_handler))
         .route("/demo/{id}", get(demo_handler))
@@ -39,7 +41,13 @@ async fn health() -> Json<Value> {
     Json(json!({ "ok": true, "service": "judix", "version": env!("CARGO_PKG_VERSION") }))
 }
 
-async fn root() -> Json<Value> {
+/// Serve the playground UI at the root so judges see the visual scorer, not JSON.
+async fn root() -> Html<&'static str> {
+    Html(INDEX_HTML)
+}
+
+/// Machine-readable service/endpoint info (the old root payload).
+async fn api_info() -> Json<Value> {
     Json(json!({
         "service": "judix",
         "tagline": "Real-time, per-turn evaluation for AI agents & RAG. A deterministic Rust engine scores; a model only explains.",
