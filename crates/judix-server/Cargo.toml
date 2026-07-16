@@ -1,0 +1,17 @@
+[package]
+name = "judix-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "judix-server"
+path = "src/main.rs"
+
+[dependencies]
+judix-core = { path = "../judix-core" }
+axum = "0.8"
+tokio = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

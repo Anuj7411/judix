@@ -1,0 +1,55 @@
+{
+  "type": "agent",
+  "id": "clean",
+  "description": "Happy path: agent books a table for 2 on Friday, correctly avoiding downtown, no loops, all steps relevant. Expected Run Quality ~90+ (green).",
+  "goal": "Book a dinner table for 2 on Friday evening, avoiding downtown.",
+  "expected_tools": ["search_restaurants", "check_availability", "book_table"],
+  "tool_schemas": {
+    "search_restaurants": {
+      "type": "object",
+      "properties": {
+        "area": { "type": "string" },
+        "party_size": { "type": "integer" },
+        "day": { "type": "string" }
+      },
+      "required": ["area", "party_size", "day"]
+    },
+    "book_table": {
+      "type": "object",
+      "properties": {
+        "restaurant": { "type": "string" },
+        "party_size": { "type": "integer" },
+        "time": { "type": "string" }
+      },
+      "required": ["restaurant", "party_size", "time"]
+    }
+  },
+  "steps": [
+    {
+      "kind": "llm",
+      "content": "The user wants a table for 2 on Friday and asked to avoid downtown. I'll search restaurants in midtown first."
+    },
+    {
+      "kind": "tool_call",
+      "name": "search_restaurants",
+      "args": { "area": "midtown", "party_size": 2, "day": "Friday" },
+      "result": "Found: Olive & Vine (midtown), Cedar Room (midtown), Fig & Thyme (uptown)."
+    },
+    {
+      "kind": "tool_call",
+      "name": "check_availability",
+      "args": { "restaurant": "Olive & Vine", "time": "19:30" },
+      "result": "Available at 19:30 for a party of 2."
+    },
+    {
+      "kind": "tool_call",
+      "name": "book_table",
+      "args": { "restaurant": "Olive & Vine", "party_size": 2, "time": "19:30" },
+      "result": "Booking confirmed: Olive & Vine, Friday 19:30, party of 2. Confirmation #A19023."
+    },
+    {
+      "kind": "llm",
+      "content": "Booked Olive & Vine (midtown) for 2 on Friday at 19:30, avoiding downtown as requested."
+    }
+  ]
+}

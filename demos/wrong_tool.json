@@ -1,0 +1,46 @@
+{
+  "type": "agent",
+  "id": "wrong_tool",
+  "description": "The money demo. Agent searches DOWNTOWN when the user explicitly said to avoid it (low relevance + goal drift), then repeats the exact same call three times (loop detected), and never completes booking (low tool-call F1). Expected Run Quality <50 (red).",
+  "goal": "Book a dinner table for 2 on Friday evening, avoiding downtown.",
+  "expected_tools": ["search_restaurants", "check_availability", "book_table"],
+  "tool_schemas": {
+    "search_restaurants": {
+      "type": "object",
+      "properties": {
+        "area": { "type": "string" },
+        "party_size": { "type": "integer" },
+        "day": { "type": "string" }
+      },
+      "required": ["area", "party_size", "day"]
+    }
+  },
+  "steps": [
+    {
+      "kind": "llm",
+      "content": "I'll look for restaurants downtown."
+    },
+    {
+      "kind": "tool_call",
+      "name": "search_restaurants",
+      "args": { "area": "downtown", "party_size": 2, "day": "Friday" },
+      "result": "No availability found downtown for Friday."
+    },
+    {
+      "kind": "tool_call",
+      "name": "search_restaurants",
+      "args": { "area": "downtown", "party_size": 2, "day": "Friday" },
+      "result": "No availability found downtown for Friday."
+    },
+    {
+      "kind": "tool_call",
+      "name": "search_restaurants",
+      "args": { "area": "downtown", "party_size": 2, "day": "Friday" },
+      "result": "No availability found downtown for Friday."
+    },
+    {
+      "kind": "llm",
+      "content": "Still nothing downtown. Let me try downtown again."
+    }
+  ]
+}

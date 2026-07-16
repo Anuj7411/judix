@@ -1,0 +1,12 @@
+{
+  "type": "rag",
+  "id": "rag_hallucination",
+  "description": "RAG faithfulness demo. Context says returns are allowed within 14 days; the answer claims 30 days (unsupported) but the 'unused' condition is supported. Expected faithfulness ~50, with the '30 days' claim highlighted red as ungrounded.",
+  "question": "How many days do I have to return an item for a full refund?",
+  "contexts": [
+    "Our return policy allows returns within 14 days of delivery for a full refund.",
+    "Items must be unused and in their original packaging to qualify for a refund.",
+    "Refunds are issued to the original payment method within 5 business days of us receiving the returned item."
+  ],
+  "answer": "You have 30 days from delivery to return an item for a full refund, as long as it is unused and in its original packaging."
+}

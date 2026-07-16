@@ -1,0 +1,13 @@
+[package]
+name = "judix-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "judix"
+path = "src/main.rs"
+
+[dependencies]
+judix-core = { path = "../judix-core" }
+serde_json = { workspace = true }
