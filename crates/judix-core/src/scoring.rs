@@ -179,11 +179,15 @@ pub fn score_agent(
     }
 }
 
-/// Compose RAG metrics into a `RagReport`, applying the faithfulness cap (§5.5):
-/// if `faithfulness < 50`, cap `rag_quality` at 49.
+/// Compose RAG metrics into a `RagReport`, applying two hard caps:
+/// - faithfulness (§5.5): if `faithfulness < 50`, cap `rag_quality` at 49 (red).
+/// - contradiction: if any claim actively *contradicts* the context (a
+///   hallucination), cap at 59 (amber) — a factual conflict is a critical quality
+///   failure, mirroring the agent loop/tool-call critical-fail cap.
 pub fn score_rag(
     metrics: Vec<MetricResult>,
     unsupported_spans: Vec<crate::types::ClaimSpan>,
+    any_contradiction: bool,
     latency_ms: u64,
     model_cost_usd: f64,
 ) -> RagReport {
@@ -197,6 +201,9 @@ pub fn score_rag(
         if f < 50.0 {
             rag_quality = rag_quality.min(49.0);
         }
+    }
+    if any_contradiction {
+        rag_quality = rag_quality.min(59.0);
     }
 
     RagReport {

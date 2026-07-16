@@ -28,6 +28,28 @@ struct Choice {
 #[derive(Deserialize)]
 struct Msg {
     content: Option<String>,
+    /// Some routed models (reasoning models) leave `content` null and put the
+    /// answer in `reasoning_content` / `reasoning`. Fall back to those.
+    #[serde(default)]
+    reasoning_content: Option<String>,
+    #[serde(default)]
+    reasoning: Option<String>,
+}
+
+impl Msg {
+    /// The usable text: prefer `content`, else fall back to reasoning fields.
+    fn text(&self) -> String {
+        let c = self.content.clone().unwrap_or_default();
+        if !c.trim().is_empty() {
+            return c;
+        }
+        if let Some(rc) = &self.reasoning_content {
+            if !rc.trim().is_empty() {
+                return rc.clone();
+            }
+        }
+        self.reasoning.clone().unwrap_or_default()
+    }
 }
 
 impl ModelClient {
@@ -38,8 +60,8 @@ impl ModelClient {
     /// |----------------------|----------------------------------|
     /// | `JUDIX_BASE_URL`     | *(must be set to enable)*        |
     /// | `JUDIX_API_KEY`      | *(optional bearer token)*        |
-    /// | `JUDIX_MODEL_FAST`   | `auto/fast`                      |
-    /// | `JUDIX_MODEL_STRONG` | `auto/reasoning`                 |
+    /// | `JUDIX_MODEL_FAST`   | `auto/best-chat`                 |
+    /// | `JUDIX_MODEL_STRONG` | `auto/best-coding`               |
     pub fn from_env() -> Option<Self> {
         let base_url = std::env::var("JUDIX_BASE_URL").ok()?;
         Some(Self {
@@ -47,9 +69,9 @@ impl ModelClient {
             base_url,
             api_key: std::env::var("JUDIX_API_KEY").ok(),
             model_fast: std::env::var("JUDIX_MODEL_FAST")
-                .unwrap_or_else(|_| "auto/fast".into()),
+                .unwrap_or_else(|_| "auto/best-chat".into()),
             model_strong: std::env::var("JUDIX_MODEL_STRONG")
-                .unwrap_or_else(|_| "auto/reasoning".into()),
+                .unwrap_or_else(|_| "auto/best-coding".into()),
             cache: ModelCache::new(1000, 3600),
         })
     }
@@ -76,7 +98,10 @@ impl ModelClient {
                 { "role": "user",   "content": user   }
             ],
             "temperature": 0.0,
-            "max_tokens": 1024
+            "max_tokens": 2048,
+            // OmniRoute (and OpenAI-compatible gateways) stream by default via SSE.
+            // We want a single JSON body we can deserialize in one shot.
+            "stream": false
         });
 
         let res = req.json(&body).send().await.map_err(|e| e.to_string())?;
@@ -90,7 +115,7 @@ impl ModelClient {
         let content = chat
             .choices
             .first()
-            .and_then(|c| c.message.content.clone())
+            .map(|c| c.message.text())
             .unwrap_or_default();
 
         self.cache.insert(model, &cache_key, content.clone()).await;
@@ -184,56 +209,84 @@ impl ModelClient {
 
     /// Score model metrics (step_relevance + goal_drift) for every step.
     /// Returns one `Vec<MetricResult>` per step, suitable for `score_agent()`.
+    ///
+    /// All model calls run **concurrently** — the per-step metrics are independent
+    /// (goal_drift depends only on the trajectory *prefix*, which we precompute
+    /// synchronously). For an N-step trace this fires 2N calls in one wave instead
+    /// of 2N sequential round-trips, cutting wall-clock from ~N·latency to ~latency.
     pub async fn score_agent_steps(
         &self,
         trace: &crate::types::AgentTrace,
     ) -> Vec<Vec<MetricResult>> {
-        let mut out = Vec::with_capacity(trace.steps.len());
+        // Precompute each step's (kind, name, content) and the trajectory prefix
+        // up to and including that step — no awaits, so no ordering constraint.
         let mut trajectory = String::new();
-
+        let mut prepared: Vec<(String, String, String, String)> =
+            Vec::with_capacity(trace.steps.len());
         for (i, step) in trace.steps.iter().enumerate() {
-            let name = step.name.as_deref().unwrap_or(&step.kind);
+            let name = step.name.clone().unwrap_or_else(|| step.kind.clone());
             let content = step
                 .content
-                .as_deref()
-                .or(step.result.as_deref())
-                .unwrap_or("");
-
-            let desc = format!("Step {i}: [{}] {name} {content}\n", step.kind);
-            trajectory.push_str(&desc);
-
-            let rel = self.step_relevance(&trace.goal, &step.kind, name, content).await;
-            let drift = self.goal_drift(&trace.goal, &trajectory).await;
-            out.push(vec![rel, drift]);
+                .clone()
+                .or_else(|| step.result.clone())
+                .unwrap_or_default();
+            trajectory.push_str(&format!("Step {i}: [{}] {name} {content}\n", step.kind));
+            prepared.push((step.kind.clone(), name, content, trajectory.clone()));
         }
-        out
+
+        // Fire every step's two metrics concurrently.
+        let futures = prepared.iter().map(|(kind, name, content, traj)| async move {
+            let (rel, drift) = futures::future::join(
+                self.step_relevance(&trace.goal, kind, name, content),
+                self.goal_drift(&trace.goal, traj),
+            )
+            .await;
+            vec![rel, drift]
+        });
+        futures::future::join_all(futures).await
     }
 
     // ------------------------------------------------------------------
     // RAG metrics
     // ------------------------------------------------------------------
 
-    async fn decompose_claims(&self, answer: &str) -> Result<Vec<String>, String> {
+    /// A decomposed claim, paired with the verbatim `quote` from the answer it came
+    /// from (so we can map it back to a char-span for red-highlighting).
+    async fn decompose_claims(&self, answer: &str) -> Result<Vec<(String, String)>, String> {
         let system = "Decompose the answer into atomic factual claims. Each claim must be a single, \
-            independently verifiable statement. Return ONLY a JSON array of strings.";
+            independently verifiable statement.\n\
+            For each claim, also return `quote`: the EXACT verbatim substring of the answer \
+            (copied character-for-character, no paraphrasing) that the claim is drawn from.\n\
+            Return ONLY a JSON array of objects: [{\"claim\": \"...\", \"quote\": \"...\"}].";
         let user = format!("Answer:\n{answer}");
 
         let text = self.chat(&self.model_strong, system, &user).await?;
         let arr = Self::parse_json(&text)
             .and_then(|v| v.as_array().cloned())
             .ok_or_else(|| format!("expected JSON array of claims, got: {text}"))?;
-        Ok(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        Ok(arr
+            .iter()
+            .filter_map(|v| {
+                let claim = v["claim"].as_str()?.to_string();
+                // Fall back to the claim text itself if no quote was returned.
+                let quote = v["quote"].as_str().unwrap_or(&claim).to_string();
+                Some((claim, quote))
+            })
+            .collect())
     }
 
+    /// A per-claim grounding verdict. `Contradicted` is a factual conflict with the
+    /// context (a hallucination) — worse than merely `Unsupported` (no evidence).
     async fn verify_claim(
         &self,
         claim: &str,
         contexts: &[String],
-    ) -> Result<(bool, String), String> {
-        let system = "Verify whether the claim is supported by the context passages.\n\
-            Return ONLY a JSON object: {\"supported\": <true|false>, \"reason\": \"<one sentence>\"}.\n\
-            Supported means the claim can be directly inferred from the contexts.\n\
-            If the claim contradicts or goes beyond what the contexts state, it is NOT supported.";
+    ) -> Result<(ClaimStatus, String), String> {
+        let system = "Verify a claim against the context passages.\n\
+            Return ONLY a JSON object: {\"status\": \"supported\"|\"unsupported\"|\"contradicted\", \"reason\": \"<one sentence>\"}.\n\
+            - \"supported\": the claim is directly inferable from the contexts.\n\
+            - \"contradicted\": the claim conflicts with a fact stated in the contexts (a hallucination).\n\
+            - \"unsupported\": the contexts neither support nor contradict the claim.";
         let ctx = contexts
             .iter()
             .enumerate()
@@ -245,10 +298,12 @@ impl ModelClient {
         let text = self.chat(&self.model_strong, system, &user).await?;
         let v = Self::parse_json(&text)
             .ok_or_else(|| format!("expected JSON verification, got: {text}"))?;
-        Ok((
-            v["supported"].as_bool().unwrap_or(false),
-            v["reason"].as_str().unwrap_or("").to_string(),
-        ))
+        let status = match v["status"].as_str().unwrap_or("unsupported") {
+            "supported" => ClaimStatus::Supported,
+            "contradicted" => ClaimStatus::Contradicted,
+            _ => ClaimStatus::Unsupported,
+        };
+        Ok((status, v["reason"].as_str().unwrap_or("").to_string()))
     }
 
     async fn answer_relevancy(&self, question: &str, answer: &str) -> MetricResult {
@@ -271,22 +326,45 @@ impl ModelClient {
         }
     }
 
-    /// Full RAG pipeline: decompose → verify each claim → compute faithfulness.
+    /// Full RAG pipeline: decompose → verify each claim (concurrently) → compute
+    /// faithfulness. `answer_relevancy` runs concurrently with the verifications.
+    /// Returns `(metrics, spans, any_contradiction)`; the caller applies the
+    /// contradiction hard-cap in `score_rag`.
     pub async fn score_rag_triple(
         &self,
         triple: &RagTriple,
-    ) -> Result<(Vec<MetricResult>, Vec<ClaimSpan>), String> {
+    ) -> Result<(Vec<MetricResult>, Vec<ClaimSpan>, bool), String> {
+        // Step 1 (must be first): decompose the answer into atomic claims + quotes.
         let claims = self.decompose_claims(&triple.answer).await?;
 
+        // Step 2: verify every claim concurrently, and run answer_relevancy in the
+        // same wave (it's independent of the verifications).
+        let verify_all = futures::future::join_all(
+            claims
+                .iter()
+                .map(|(claim, _quote)| self.verify_claim(claim, &triple.contexts)),
+        );
+        let (verdicts, relevancy) = futures::future::join(
+            verify_all,
+            self.answer_relevancy(&triple.question, &triple.answer),
+        )
+        .await;
+
         let mut supported_count = 0usize;
+        let mut any_contradiction = false;
         let mut spans = Vec::with_capacity(claims.len());
 
-        for claim in &claims {
-            let (supported, _reason) = self.verify_claim(claim, &triple.contexts).await?;
+        for ((claim, quote), verdict) in claims.iter().zip(verdicts) {
+            let status = verdict.map(|(s, _)| s).unwrap_or(ClaimStatus::Unsupported);
+            let supported = status == ClaimStatus::Supported;
             if supported {
                 supported_count += 1;
             }
-            let char_span = deterministic::find_span(&triple.answer, claim);
+            if status == ClaimStatus::Contradicted {
+                any_contradiction = true;
+            }
+            // Map the claim back to the answer via its verbatim quote.
+            let char_span = deterministic::find_span(&triple.answer, quote);
             spans.push(ClaimSpan {
                 start: char_span.map(|(s, _)| s).unwrap_or(0),
                 end: char_span.map(|(_, e)| e).unwrap_or(0),
@@ -296,17 +374,24 @@ impl ModelClient {
         }
 
         let faith_score = deterministic::faithfulness_ratio(supported_count, claims.len());
-        let faithfulness = MetricResult::model(
-            "faithfulness",
-            faith_score,
-            0.85,
-            format!("{supported_count}/{} claims supported", claims.len()),
-        );
+        let faith_reason = if any_contradiction {
+            format!(
+                "{supported_count}/{} claims supported — contains a contradiction (hallucination)",
+                claims.len()
+            )
+        } else {
+            format!("{supported_count}/{} claims supported", claims.len())
+        };
+        let faithfulness = MetricResult::model("faithfulness", faith_score, 0.85, faith_reason);
 
-        let relevancy = self
-            .answer_relevancy(&triple.question, &triple.answer)
-            .await;
-
-        Ok((vec![faithfulness, relevancy], spans))
+        Ok((vec![faithfulness, relevancy], spans, any_contradiction))
     }
+}
+
+/// Per-claim grounding verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClaimStatus {
+    Supported,
+    Unsupported,
+    Contradicted,
 }

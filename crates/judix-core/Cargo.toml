@@ -13,10 +13,11 @@ jsonschema = { workspace = true }
 sha2 = { workspace = true, optional = true }
 moka = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
 
 [features]
 default = []
-model = ["dep:sha2", "dep:moka", "dep:reqwest"]
+model = ["dep:sha2", "dep:moka", "dep:reqwest", "dep:futures"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

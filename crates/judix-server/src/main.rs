@@ -96,9 +96,9 @@ async fn score_rag_handler(
 
     let t0 = std::time::Instant::now();
     match client.score_rag_triple(&triple).await {
-        Ok((metrics, spans)) => {
+        Ok((metrics, spans, any_contradiction)) => {
             let latency = t0.elapsed().as_millis() as u64;
-            let report = score_rag(metrics, spans, latency, 0.0);
+            let report = score_rag(metrics, spans, any_contradiction, latency, 0.0);
             (StatusCode::OK, Json(json!(report)))
         }
         Err(e) => (

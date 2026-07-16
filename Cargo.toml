@@ -16,6 +16,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "gzi
 moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10"
 jsonschema = "0.20"
+futures = "0.3"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

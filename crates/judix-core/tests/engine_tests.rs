@@ -139,13 +139,30 @@ fn rag_quality_capped_when_faithfulness_below_50() {
         MetricResult::model("context_precision", 90.0, 0.9, "relevant contexts"),
         MetricResult::model("context_recall", 90.0, 0.9, "covers the answer"),
     ];
-    let report = score_rag(metrics, vec![], 0, 0.0);
+    let report = score_rag(metrics, vec![], false, 0, 0.0);
     assert!(
         report.rag_quality <= 49.0,
         "ungrounded answer must be capped, got {}",
         report.rag_quality
     );
     assert_eq!(report.band, Band::Red);
+}
+
+#[test]
+fn contradiction_caps_rag_quality_at_amber() {
+    // A hallucination (contradicted claim) must never read green, even when
+    // faithfulness stays above 50 and the answer is highly relevant.
+    let metrics = vec![
+        MetricResult::model("faithfulness", 75.0, 0.85, "3/4 claims supported — contains a contradiction"),
+        MetricResult::model("answer_relevancy", 100.0, 1.0, "directly answers"),
+    ];
+    let report = score_rag(metrics, vec![], true, 0, 0.0);
+    assert!(
+        report.rag_quality <= 59.0,
+        "a contradicted claim must cap the headline at amber, got {}",
+        report.rag_quality
+    );
+    assert_ne!(report.band, Band::Green);
 }
 
 #[test]
