@@ -14,10 +14,11 @@ sha2 = { workspace = true, optional = true }
 moka = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 
 [features]
 default = []
-model = ["dep:sha2", "dep:moka", "dep:reqwest", "dep:futures"]
+model = ["dep:sha2", "dep:moka", "dep:reqwest", "dep:futures", "dep:tokio"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

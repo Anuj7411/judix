@@ -23,6 +23,16 @@ use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::json;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Semaphore;
+
+/// Cap on in-flight model calls. Free tiers are strict (Gemini free ≈ 5 req/min),
+/// so we don't blast every step's calls at once — a small pool plus retry keeps
+/// us under the limit instead of eating a wall of 429s.
+const MAX_CONCURRENCY: usize = 3;
+/// How many times to retry a 429/503 before giving up on a single call.
+const MAX_RETRIES: u32 = 4;
 
 /// One OpenAI-compatible endpoint (base URL + key + model name).
 #[derive(Clone)]
@@ -38,6 +48,7 @@ pub struct ModelClient {
     fast: Provider,
     strong: Provider,
     cache: ModelCache,
+    sem: Arc<Semaphore>,
 }
 
 // --- Chat wire types -------------------------------------------------------
@@ -166,6 +177,7 @@ impl ModelClient {
             fast,
             strong,
             cache: ModelCache::new(1000, 3600),
+            sem: Arc::new(Semaphore::new(MAX_CONCURRENCY)),
         })
     }
 
@@ -221,21 +233,44 @@ impl ModelClient {
             "response_format": { "type": "json_object" }
         });
 
-        let res = self
-            .http
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {}", provider.api_key))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
+        // Retry loop for rate limits (429) and transient overload (503). Each
+        // attempt takes a concurrency permit only for the duration of the request,
+        // releasing it while backing off so other calls can proceed.
+        let mut attempt = 0u32;
+        let res = loop {
+            let permit = self.sem.acquire().await.map_err(|e| e.to_string())?;
+            let sent = self
+                .http
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Bearer {}", provider.api_key))
+                .json(&body)
+                .send()
+                .await;
+            drop(permit);
 
-        if !res.status().is_success() {
-            let status = res.status();
-            let text = res.text().await.unwrap_or_default();
-            return Err(format!("model API {status}: {text}"));
-        }
+            match sent {
+                Ok(r) if r.status().is_success() => break r,
+                Ok(r) if (r.status() == 429 || r.status() == 503) && attempt < MAX_RETRIES => {
+                    let delay = Self::retry_after(&r).unwrap_or(2u64.pow(attempt + 1) * 2);
+                    tokio::time::sleep(Duration::from_secs(delay.min(20))).await;
+                    attempt += 1;
+                    continue;
+                }
+                Ok(r) => {
+                    let status = r.status();
+                    let text = r.text().await.unwrap_or_default();
+                    let short: String = text.chars().take(200).collect();
+                    return Err(format!("model API {status}: {short}"));
+                }
+                Err(_e) if attempt < MAX_RETRIES => {
+                    tokio::time::sleep(Duration::from_secs(2u64.pow(attempt + 1))).await;
+                    attempt += 1;
+                    continue;
+                }
+                Err(e) => return Err(e.to_string()),
+            }
+        };
 
         let chat: ChatResponse = res.json().await.map_err(|e| e.to_string())?;
         let text = chat.choices.first().map(|c| c.message.text()).unwrap_or_default();
@@ -248,6 +283,17 @@ impl ModelClient {
             .insert(check, &provider.model, &cache_input, text.clone())
             .await;
         Ok(ChatOut { text, cost_usd })
+    }
+
+    /// Seconds to wait per the `Retry-After` header, if present and numeric.
+    fn retry_after(res: &reqwest::Response) -> Option<u64> {
+        res.headers()
+            .get(reqwest::header::RETRY_AFTER)?
+            .to_str()
+            .ok()?
+            .trim()
+            .parse::<u64>()
+            .ok()
     }
 
     /// Tolerant JSON extraction → strict serde. Tries raw parse, ```json fences,

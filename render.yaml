@@ -2,20 +2,29 @@ services:
   - type: web
     name: judix
     runtime: docker
-    plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
+    plan: free
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      # Point at your OmniRoute instance to enable model-powered metrics
-      # (step_relevance, goal_drift, RAG faithfulness). Deterministic scoring
-      # works without it.
+      # Model layer (§7/§8). Deterministic scoring works with these unset; set
+      # JUDIX_API_KEY (a Gemini key) to light up step_relevance / goal_drift /
+      # RAG faithfulness. Fast = Gemini 3.x Flash (primary judge); strong =
+      # escalation for low-confidence checks (defaults to fast when its own
+      # URL/key are unset). Keys are dashboard secrets (sync:false), never in git.
       - key: JUDIX_BASE_URL
-        sync: false
+        value: https://generativelanguage.googleapis.com/v1beta/openai
       - key: JUDIX_API_KEY
         sync: false
       - key: JUDIX_MODEL_FAST
-        value: auto/fast
+        value: gemini-3.1-flash-lite
       - key: JUDIX_MODEL_STRONG
-        value: auto/reasoning
+        value: gemini-3.1-flash-lite
+      # Optional: a separate strong provider (e.g. Groq) for escalation.
+      # - key: JUDIX_STRONG_BASE_URL
+      #   value: https://api.groq.com/openai/v1
+      # - key: JUDIX_STRONG_API_KEY
+      #   sync: false
+      # - key: JUDIX_MODEL_STRONG
+      #   value: llama-3.3-70b-versatile
