@@ -42,6 +42,18 @@ const MAX_RETRIES: u32 = 4;
 /// Ceiling on any single backoff sleep.
 const MAX_BACKOFF_MS: u64 = 12_000;
 
+/// How many steps of a trace get **model** checks in a single request.
+///
+/// Security bound, not a performance knob. The model layer fires 2 calls per step with
+/// no natural ceiling, and a minimal step is ~30 bytes — so ~60k steps fit inside axum's
+/// 2MB body limit, which would mean ~120k model calls from ONE unauthenticated request.
+/// Against a 1000-req/day free tier that is a trivial denial-of-wallet: a single curl
+/// exhausts the quota and takes the public demo down.
+///
+/// Steps past the cap still get **full deterministic scoring** — that path is free,
+/// local, and O(n), so trace size is only ever a threat via the model layer.
+const DEFAULT_MAX_MODEL_STEPS: usize = 40;
+
 /// §7.2 — judge one step against the goal, including constraints encoded in tool args.
 const REL_SYS: &str = "You evaluate ONE step of an AI agent's trajectory against the user's GOAL. \
     The goal may contain explicit constraints (e.g. 'avoiding downtown'). Rate how relevant \
@@ -91,6 +103,9 @@ pub struct ModelClient {
     /// chronically overconfident — Gemini self-reports ≥0.5 even on genuinely
     /// ambiguous input — so this is exposed rather than hard-coded.
     escalate_below: f32,
+    /// See [`DEFAULT_MAX_MODEL_STEPS`]. Bounds model calls per request so an
+    /// oversized trace can't drain the quota.
+    max_model_steps: usize,
 }
 
 // --- Chat wire types -------------------------------------------------------
@@ -296,6 +311,10 @@ impl ModelClient {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0.6),
+            max_model_steps: std::env::var("JUDIX_MAX_MODEL_STEPS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_MAX_MODEL_STEPS),
         })
     }
 
@@ -627,8 +646,9 @@ impl ModelClient {
     /// concurrently. Returns per-step metrics and total model $.
     pub async fn score_agent_steps(&self, trace: &AgentTrace) -> (Vec<Vec<MetricResult>>, f64) {
         let prepared = Self::prepare_steps(trace);
+        let scored = prepared.len().min(self.max_model_steps);
 
-        let futures = prepared.iter().map(|(step_desc, traj)| async move {
+        let futures = prepared.iter().take(scored).map(|(step_desc, traj)| async move {
             let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
             let drift_user = format!("ORIGINAL GOAL: {}\n\nTRAJECTORY SO FAR:\n{traj}", trace.goal);
             let ((rel, c1), (drift, c2)) = futures::future::join(
@@ -641,8 +661,25 @@ impl ModelClient {
 
         let results = futures::future::join_all(futures).await;
         let cost = results.iter().map(|(_, c)| c).sum();
-        let metrics = results.into_iter().map(|(m, _)| m).collect();
+        let mut metrics: Vec<Vec<MetricResult>> = results.into_iter().map(|(m, _)| m).collect();
+
+        // Say so, rather than silently returning fewer metrics than there are steps.
+        for _ in scored..prepared.len() {
+            metrics.push(Self::capped_metrics(self.max_model_steps));
+        }
         (metrics, cost)
+    }
+
+    /// `na` metrics explaining that a step was past the model-call budget. Being
+    /// explicit matters: a silently unscored step looks identical to a bug, and `na`
+    /// metrics are excluded from the composite rather than dragging it down.
+    fn capped_metrics(max: usize) -> Vec<MetricResult> {
+        let reason =
+            format!("step beyond the first {max} — model checks capped per request (JUDIX_MAX_MODEL_STEPS); deterministic scoring still applied");
+        vec![
+            MetricResult::na("step_relevance", MetricSource::Model).with_reason(reason.clone()),
+            MetricResult::na("goal_drift", MetricSource::Model).with_reason(reason),
+        ]
     }
 
     /// Same checks as [`score_agent_steps`], but yielded **as each one lands** rather
@@ -659,9 +696,12 @@ impl ModelClient {
         trace: &'a AgentTrace,
     ) -> impl futures::Stream<Item = (usize, MetricResult, f64)> + 'a {
         let prepared = Self::prepare_steps(trace);
+        let scored = prepared.len().min(self.max_model_steps);
         let futs = futures::stream::FuturesUnordered::new();
 
-        for (i, (step_desc, traj)) in prepared.into_iter().enumerate() {
+        // Same per-request model-call budget as `score_agent_steps` — streaming must not
+        // be a way around the cap.
+        for (i, (step_desc, traj)) in prepared.into_iter().enumerate().take(scored) {
             let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
             futs.push(future::Either::Left(async move {
                 let (m, c) = self.scored_check("step_relevance", REL_SYS, &rel_user).await;

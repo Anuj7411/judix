@@ -155,6 +155,41 @@ fn all_scores_stay_within_0_to_100() {
     }
 }
 
+/// The deterministic engine must stay safe at any trace size: it's the path that
+/// always runs, on every request, before any cap applies. A 10k-step trace inside
+/// axum's 2MB body limit is trivially reachable by an attacker, so O(n²) here (or a
+/// panic) would be a free DoS. Loop detection uses a fixed-size sliding window, so
+/// this should be linear and effectively instant.
+#[test]
+fn deterministic_engine_handles_a_huge_trace_fast() {
+    let steps: Vec<AgentStep> = (0..10_000)
+        .map(|i| AgentStep {
+            kind: "tool_call".into(),
+            name: Some("search".into()),
+            args: Some(json!({ "q": format!("query {i}") })),
+            result: Some("ok".into()),
+            content: None,
+        })
+        .collect();
+    let trace = AgentTrace {
+        goal: "stress".into(),
+        steps,
+        expected_tools: Some(vec!["search".into()]),
+        tool_schemas: None,
+    };
+
+    let t0 = std::time::Instant::now();
+    let report = score_agent(&trace, &[], 0, 0.0);
+    let elapsed = t0.elapsed();
+
+    assert_eq!(report.steps.len(), 10_000);
+    assert!((0.0..=100.0).contains(&report.run_quality));
+    assert!(
+        elapsed.as_secs() < 5,
+        "10k-step deterministic scoring took {elapsed:?} — should be ~linear"
+    );
+}
+
 #[test]
 fn faithfulness_ratio_math() {
     assert_eq!(faithfulness_ratio(1, 2), 50.0);
