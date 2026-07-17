@@ -415,6 +415,16 @@ impl ModelClient {
         })
     }
 
+    /// How many endpoints are in the failover pool, and their model names.
+    ///
+    /// Exposed on `/health` because a mis-pasted `JUDIX_EXTRA_PROVIDERS` fails *quietly*
+    /// — the pool silently falls back to two endpoints and every metric turns `na` once
+    /// those are throttled, which looks identical to "the model layer is broken". Same
+    /// lesson as the `commit` field: if you can't see it, you'll debug the wrong thing.
+    pub fn pool_summary(&self) -> Vec<String> {
+        self.pool.iter().map(|p| p.model.clone()).collect()
+    }
+
     /// Additional failover providers from `JUDIX_EXTRA_PROVIDERS`, a JSON array of
     /// `{base_url, api_key, model}`. Any OpenAI-compatible endpoint works, so adding
     /// capacity (e.g. a third free tier) is a config change, not a deploy of new code.

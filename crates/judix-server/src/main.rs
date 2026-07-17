@@ -210,6 +210,9 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
         "model_layer": if state.model.is_some() { "enabled" } else { "disabled (set JUDIX_API_KEY)" },
         "model_fast": std::env::var("JUDIX_MODEL_FAST").unwrap_or_else(|_| "-".into()),
+        // The failover pool, so a mis-pasted JUDIX_EXTRA_PROVIDERS is visible instead of
+        // silently degrading to two endpoints and all-`na` metrics.
+        "model_pool": state.model.as_ref().map(|m| m.pool_summary()).unwrap_or_default(),
         // Which commit is ACTUALLY serving traffic. Render injects RENDER_GIT_COMMIT.
         // Without this a stale deploy is invisible — this service silently served a
         // build from ~10 commits back for a full day because nothing reported the
