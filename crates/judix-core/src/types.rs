@@ -149,6 +149,11 @@ pub struct ClaimSpan {
     pub end: usize,
     pub text: String,
     pub supported: bool,
+    /// True when the claim actively *conflicts* with the contexts (a hallucination),
+    /// as opposed to merely lacking evidence. Lets the UI show red vs amber, and
+    /// drives the RAG critical-fail cap.
+    #[serde(default)]
+    pub contradicted: bool,
 }
 
 /// RAG triple report (§5.5).

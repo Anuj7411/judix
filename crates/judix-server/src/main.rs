@@ -40,8 +40,17 @@ pub fn build_app() -> Router {
         .with_state(state)
 }
 
-async fn health() -> Json<Value> {
-    Json(json!({ "ok": true, "service": "judix", "version": env!("CARGO_PKG_VERSION") }))
+/// Liveness + config visibility. `model_layer` reports whether the explanation
+/// layer is live, so a deploy can be verified without poking a scoring endpoint
+/// (deterministic scoring works either way; only the model metrics need a key).
+async fn health(State(state): State<AppState>) -> Json<Value> {
+    Json(json!({
+        "ok": true,
+        "service": "judix",
+        "version": env!("CARGO_PKG_VERSION"),
+        "model_layer": if state.model.is_some() { "enabled" } else { "disabled (set JUDIX_API_KEY)" },
+        "model_fast": std::env::var("JUDIX_MODEL_FAST").unwrap_or_else(|_| "-".into()),
+    }))
 }
 
 async fn root() -> Html<&'static str> {
@@ -96,9 +105,9 @@ async fn score_rag_handler(
 
     let t0 = std::time::Instant::now();
     match client.score_rag_triple(&triple).await {
-        Ok((metrics, spans, cost)) => {
+        Ok((metrics, spans, any_contradiction, cost)) => {
             let latency = t0.elapsed().as_millis() as u64;
-            let report = score_rag(metrics, spans, latency, cost);
+            let report = score_rag(metrics, spans, any_contradiction, latency, cost);
             (StatusCode::OK, Json(json!(report)))
         }
         Err(e) => (

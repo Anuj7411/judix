@@ -179,11 +179,19 @@ pub fn score_agent(
     }
 }
 
-/// Compose RAG metrics into a `RagReport`, applying the faithfulness cap (§5.5):
-/// if `faithfulness < 50`, cap `rag_quality` at 49 (red).
+/// Compose RAG metrics into a `RagReport`, applying two hard caps:
+///
+/// - **Faithfulness (§5.5):** `faithfulness < 50` → cap at 49 (red).
+/// - **Contradiction (critical fail):** any claim that *conflicts* with the context
+///   → cap at 49 (red). Faithfulness is a ratio, and ratios dilute severity: an
+///   answer with 3 harmless-correct claims and 1 catastrophically wrong one scores
+///   75 and reads "fine", even though acting on it causes real harm. This mirrors
+///   the agent-side critical-fail caps (§5.3/§5.4), where a loop or failed tool
+///   check overrides the weighted average rather than being averaged away.
 pub fn score_rag(
     metrics: Vec<MetricResult>,
     unsupported_spans: Vec<crate::types::ClaimSpan>,
+    any_contradiction: bool,
     latency_ms: u64,
     model_cost_usd: f64,
 ) -> RagReport {
@@ -197,6 +205,9 @@ pub fn score_rag(
         if f < 50.0 {
             rag_quality = rag_quality.min(49.0);
         }
+    }
+    if any_contradiction {
+        rag_quality = rag_quality.min(49.0);
     }
 
     RagReport {

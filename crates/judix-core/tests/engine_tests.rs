@@ -139,10 +139,32 @@ fn rag_quality_capped_when_faithfulness_below_50() {
         MetricResult::model("context_precision", 90.0, 0.9, "relevant contexts"),
         MetricResult::model("context_recall", 90.0, 0.9, "covers the answer"),
     ];
-    let report = score_rag(metrics, vec![], 0, 0.0);
+    let report = score_rag(metrics, vec![], false, 0, 0.0);
     assert!(
         report.rag_quality <= 49.0,
         "ungrounded answer must be capped, got {}",
+        report.rag_quality
+    );
+    assert_eq!(report.band, Band::Red);
+}
+
+#[test]
+fn contradiction_caps_rag_quality_even_when_ratio_looks_healthy() {
+    // Mirrors rag_hallucination.json under real Gemini decomposition: 3 of 4 claims
+    // are grounded (faithfulness 75) and the answer reads perfectly relevant — but
+    // one claim CONTRADICTS the context ("30 days" vs the policy's 14). Without the
+    // critical-fail cap the ratio dilutes that to 61.6 (amber, "mostly fine") even
+    // though acting on the answer causes real harm.
+    let metrics = vec![
+        MetricResult::model("faithfulness", 75.0, 0.9, "3/4 grounded — 1 CONTRADICTS the context"),
+        MetricResult::model("answer_relevancy", 100.0, 1.0, "directly answers"),
+        MetricResult::model("context_precision", 33.0, 0.9, "answer contradicts context 1"),
+        MetricResult::model("context_recall", 0.0, 0.9, "context says 14 days, answer says 30"),
+    ];
+    let report = score_rag(metrics, vec![], true, 0, 0.0);
+    assert!(
+        report.rag_quality <= 49.0,
+        "a contradicted claim is a critical failure and must force red, got {}",
         report.rag_quality
     );
     assert_eq!(report.band, Band::Red);
@@ -158,6 +180,7 @@ fn find_span_locates_unsupported_claim() {
         end: span.1,
         text: "30 days".into(),
         supported: false,
+        contradicted: true,
     };
 }
 

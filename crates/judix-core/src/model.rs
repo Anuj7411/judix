@@ -144,8 +144,29 @@ struct VerifyOut {
 struct VerifyItem {
     #[serde(default)]
     id: u64,
+    /// "supported" | "unsupported" | "contradicted". A contradiction is a factual
+    /// conflict with the context (a hallucination) — strictly worse than having no
+    /// evidence, and treated as a critical failure by `score_rag`.
     #[serde(default)]
-    supported: bool,
+    status: String,
+}
+
+/// Grounding verdict for one claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimStatus {
+    Supported,
+    Unsupported,
+    Contradicted,
+}
+
+impl ClaimStatus {
+    fn parse(s: &str) -> Self {
+        match s.trim().to_lowercase().as_str() {
+            "supported" => ClaimStatus::Supported,
+            "contradicted" => ClaimStatus::Contradicted,
+            _ => ClaimStatus::Unsupported,
+        }
+    }
 }
 
 impl ModelClient {
@@ -471,11 +492,14 @@ impl ModelClient {
         &self,
         claims: &[(String, String)],
         contexts: &[String],
-    ) -> Result<(Vec<bool>, f64), String> {
-        let system = "Given CONTEXTS and a numbered list of CLAIMS, decide for EACH claim whether it \
-            is supported by the contexts. `supported` is true ONLY if the claim can be directly \
-            inferred from some context; if it conflicts with or goes beyond the contexts, it is false. \
-            Respond ONLY as JSON {\"results\":[{\"id\":1,\"supported\":true,\"context_index\":1,\"reason\":\"...\"}]}.";
+    ) -> Result<(Vec<ClaimStatus>, f64), String> {
+        let system = "Given CONTEXTS and a numbered list of CLAIMS, classify EACH claim against the \
+            contexts with one of three statuses:\n\
+            - \"supported\": the claim can be directly inferred from some context.\n\
+            - \"contradicted\": the claim CONFLICTS with a fact stated in a context (e.g. the context \
+              says 14 days and the claim says 30 days). This is a hallucination.\n\
+            - \"unsupported\": the contexts neither support nor contradict the claim.\n\
+            Respond ONLY as JSON {\"results\":[{\"id\":1,\"status\":\"supported\",\"context_index\":1,\"reason\":\"...\"}]}.";
         let ctx = contexts
             .iter()
             .enumerate()
@@ -495,14 +519,14 @@ impl ModelClient {
             .ok_or_else(|| format!("unparseable verification: {}", out.text))?;
 
         // Map verdicts back by 1-based id; default unsupported if the model omits one.
-        let mut supported = vec![false; claims.len()];
+        let mut statuses = vec![ClaimStatus::Unsupported; claims.len()];
         for r in parsed.results {
             let idx = r.id as usize;
             if idx >= 1 && idx <= claims.len() {
-                supported[idx - 1] = r.supported;
+                statuses[idx - 1] = ClaimStatus::parse(&r.status);
             }
         }
-        Ok((supported, out.cost_usd))
+        Ok((statuses, out.cost_usd))
     }
 
     fn strong_or_fast(&self) -> Provider {
@@ -511,11 +535,12 @@ impl ModelClient {
 
     /// Full RAG scoring: faithfulness (decompose → batched verify → ratio in Rust,
     /// with unsupported spans), plus answer_relevancy, context_precision, and
-    /// context_recall. Returns `(metrics, unsupported_spans, cost)`.
+    /// context_recall. Returns `(metrics, spans, any_contradiction, cost)`, where
+    /// `any_contradiction` drives the critical-fail cap in `score_rag`.
     pub async fn score_rag_triple(
         &self,
         triple: &RagTriple,
-    ) -> Result<(Vec<MetricResult>, Vec<ClaimSpan>, f64), String> {
+    ) -> Result<(Vec<MetricResult>, Vec<ClaimSpan>, bool, f64), String> {
         // Step 1: decompose (must precede verify).
         let (claims, decompose_cost) = self.decompose_claims(&triple.answer).await?;
 
@@ -552,34 +577,54 @@ impl ModelClient {
         )
         .await;
 
-        let (supported, verify_cost) = verify_res?;
-        let supported_count = supported.iter().filter(|s| **s).count();
+        let (statuses, verify_cost) = verify_res?;
+        let supported_count = statuses
+            .iter()
+            .filter(|s| **s == ClaimStatus::Supported)
+            .count();
+        let contradicted_count = statuses
+            .iter()
+            .filter(|s| **s == ClaimStatus::Contradicted)
+            .count();
+        let any_contradiction = contradicted_count > 0;
         let faith_score = deterministic::faithfulness_ratio(supported_count, claims.len());
 
-        // Map each claim to a char-span via its verbatim quote (unsupported → red).
+        // Map each claim to a char-span via its verbatim quote, so the UI can
+        // highlight ungrounded text (contradicted = red, unsupported = amber).
         let mut spans = Vec::with_capacity(claims.len());
-        for ((claim_text, quote), &ok) in claims.iter().zip(supported.iter()) {
+        for ((claim_text, quote), status) in claims.iter().zip(statuses.iter()) {
             let span = deterministic::find_span(&triple.answer, quote);
             spans.push(ClaimSpan {
                 start: span.map(|(s, _)| s).unwrap_or(0),
                 end: span.map(|(_, e)| e).unwrap_or(0),
                 text: claim_text.clone(),
-                supported: ok,
+                supported: *status == ClaimStatus::Supported,
+                contradicted: *status == ClaimStatus::Contradicted,
             });
         }
 
-        let faithfulness = MetricResult::model(
-            "faithfulness",
-            faith_score,
-            0.9,
-            format!("{supported_count}/{} claims grounded in the contexts", claims.len()),
-        );
+        // A ratio dilutes severity: 3 harmless-correct claims outvote 1 catastrophically
+        // wrong one. Name the contradiction explicitly so the headline can't read "fine".
+        let faith_reason = if any_contradiction {
+            format!(
+                "{supported_count}/{} claims grounded — {contradicted_count} CONTRADICTS the context (hallucination)",
+                claims.len()
+            )
+        } else {
+            format!("{supported_count}/{} claims grounded in the contexts", claims.len())
+        };
+        let faithfulness = MetricResult::model("faithfulness", faith_score, 0.9, faith_reason);
 
         let (ar_m, ar_c) = ar;
         let (cp_m, cp_c) = cp;
         let (cr_m, cr_c) = cr;
         let total_cost = decompose_cost + verify_cost + ar_c + cp_c + cr_c;
 
-        Ok((vec![faithfulness, ar_m, cp_m, cr_m], spans, total_cost))
+        Ok((
+            vec![faithfulness, ar_m, cp_m, cr_m],
+            spans,
+            any_contradiction,
+            total_cost,
+        ))
     }
 }
