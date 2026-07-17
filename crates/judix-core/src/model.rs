@@ -253,12 +253,14 @@ fn point_seven() -> f64 {
 }
 
 /// Both per-step judgements from a single call.
+///
+/// Fields are deliberately required (no `#[serde(default)]`): a response missing a
+/// judgement must fail to deserialize so `chat_json` treats that provider as failed and
+/// asks the next one, rather than quietly yielding half a report.
 #[derive(Deserialize)]
 struct StepPairOut {
-    #[serde(default)]
-    step_relevance: Option<ScoreOut>,
-    #[serde(default)]
-    goal_drift: Option<ScoreOut>,
+    step_relevance: ScoreOut,
+    goal_drift: ScoreOut,
 }
 
 #[derive(Deserialize)]
@@ -537,6 +539,36 @@ impl ModelClient {
     /// Cached under `primary.model` regardless of which provider actually answered:
     /// the cache key is the *logical route* (check + input), and either provider's
     /// answer is a valid response to the same question.
+    /// [`chat`], but the response must deserialize into `T` — and a provider whose output
+    /// doesn't is treated as a **failed provider** and skipped for the next one.
+    ///
+    /// Models are flaky at structured output in ways that aren't deterministic: the same
+    /// prompt to the same model returns clean JSON once and rejects the next time. That
+    /// used to surface as `na` metrics (6 of 10 on the clean demo) because the caller
+    /// parsed *after* failover had already given up. Parsing inside the loop turns "this
+    /// model babbled" into "ask the next one" — which is exactly what a pool is for, and
+    /// it means one unreliable model can't put holes in a report.
+    async fn chat_json<T: DeserializeOwned>(
+        &self,
+        primary: &Provider,
+        secondary: &Provider,
+        check: &str,
+        system: &str,
+        user: &str,
+        max_tokens: u32,
+    ) -> Result<(T, f64), String> {
+        let out = self
+            .chat_validated(primary, secondary, check, system, user, max_tokens, &|t| {
+                Self::parse::<T>(t).is_some()
+            })
+            .await?;
+        // Re-parse: the validator proved this succeeds.
+        match Self::parse::<T>(&out.text) {
+            Some(v) => Ok((v, out.cost_usd)),
+            None => Err("validated output failed to re-parse".into()),
+        }
+    }
+
     async fn chat(
         &self,
         primary: &Provider,
@@ -546,9 +578,27 @@ impl ModelClient {
         user: &str,
         max_tokens: u32,
     ) -> Result<ChatOut, String> {
+        self.chat_validated(primary, secondary, check, system, user, max_tokens, &|_| true)
+            .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn chat_validated(
+        &self,
+        primary: &Provider,
+        secondary: &Provider,
+        check: &str,
+        system: &str,
+        user: &str,
+        max_tokens: u32,
+        accept: &(dyn Fn(&str) -> bool + Send + Sync),
+    ) -> Result<ChatOut, String> {
         let cache_input = format!("{system}\n---\n{user}");
         if let Some(cached) = self.cache.get(check, &primary.model, &cache_input).await {
-            return Ok(ChatOut { text: cached, cost_usd: 0.0 });
+            // Only serve a cache hit the caller can actually use.
+            if accept(&cached) {
+                return Ok(ChatOut { text: cached, cost_usd: 0.0 });
+            }
         }
 
         let mut last_err: Option<String> = None;
@@ -574,10 +624,20 @@ impl ModelClient {
             for provider in order {
                 match self.chat_once(provider, check, system, user, max_tokens).await {
                     Ok(out) => {
+                        // A model that answers with unusable output is a failed provider,
+                        // not a failed request — hand the work to the next one.
+                        if !accept(&out.text) {
+                            tracing::warn!(check, model = %provider.model,
+                                "unparseable output — trying next provider");
+                            last_err = Some(format!("unparseable output from {}", provider.model));
+                            continue;
+                        }
                         if !provider.same_as(primary) {
                             tracing::info!(check, from = %primary.model, to = %provider.model,
                                 "failed over to another pooled provider");
                         }
+                        // Cache only usable output, so one bad response can't be served
+                        // for the whole TTL.
                         self.cache
                             .insert(check, &primary.model, &cache_input, out.text.clone())
                             .await;
@@ -808,8 +868,8 @@ impl ModelClient {
         let user =
             format!("GOAL: {goal}\n\nSTEP: {step_desc}\n\nRECENT STEPS:\n{recent}");
 
-        let (parsed, mut cost) = match self
-            .chat(
+        let (pair, mut cost) = match self
+            .chat_json::<StepPairOut>(
                 &self.fast,
                 &self.strong,
                 "step_pair",
@@ -819,22 +879,17 @@ impl ModelClient {
             )
             .await
         {
-            Ok(o) => (Self::parse::<StepPairOut>(&o.text), o.cost_usd),
+            Ok(v) => v,
             Err(e) => return Self::step_pair_na(&format!("model call failed: {e}"), 0.0),
         };
 
-        let Some(pair) = parsed else {
-            return Self::step_pair_na("unparseable model response", cost);
-        };
-        let (Some(rel), Some(drift)) = (pair.step_relevance, pair.goal_drift) else {
-            return Self::step_pair_na("model response missing a judgement", cost);
-        };
+        let (rel, drift) = (pair.step_relevance, pair.goal_drift);
 
         let uncertain = (rel.confidence as f32) < self.escalate_below
             || (drift.confidence as f32) < self.escalate_below;
         if uncertain {
-            if let Ok(o) = self
-                .chat(
+            if let Ok((p, c)) = self
+                .chat_json::<StepPairOut>(
                     &self.strong,
                     &self.fast,
                     "step_pair",
@@ -844,17 +899,13 @@ impl ModelClient {
                 )
                 .await
             {
-                cost += o.cost_usd;
-                if let Some(p) = Self::parse::<StepPairOut>(&o.text) {
-                    if let (Some(r), Some(d)) = (p.step_relevance, p.goal_drift) {
-                        let mut rm = Self::to_metric("step_relevance", r);
-                        let mut dm = Self::to_metric("goal_drift", d);
-                        // We escalated because the fast pass was uncertain — flag it.
-                        rm.low_confidence = true;
-                        dm.low_confidence = true;
-                        return (rm, dm, cost);
-                    }
-                }
+                cost += c;
+                let mut rm = Self::to_metric("step_relevance", p.step_relevance);
+                let mut dm = Self::to_metric("goal_drift", p.goal_drift);
+                // We escalated because the fast pass was uncertain — flag it.
+                rm.low_confidence = true;
+                dm.low_confidence = true;
+                return (rm, dm, cost);
             }
         }
 
