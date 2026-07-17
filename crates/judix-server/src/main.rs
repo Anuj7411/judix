@@ -30,6 +30,10 @@ pub fn build_app() -> Router {
     }
     let state = AppState { model };
 
+    if let Some(client) = state.model.clone() {
+        tokio::spawn(prewarm(client));
+    }
+
     Router::new()
         .route("/health", get(health))
         .route("/", get(root))
@@ -38,6 +42,42 @@ pub fn build_app() -> Router {
         .route("/score/rag", post(score_rag_handler))
         .route("/demo/{id}", get(demo_handler))
         .with_state(state)
+}
+
+/// Score the built-in demo fixtures once at boot, in the background, so the first
+/// visitor never pays the cold path.
+///
+/// Measured: a warm RAG score is ~0.5s, but the very first one took 13.7s in
+/// production vs 2.24s locally. The gap is the free tier's 0.1 CPU — the initial TLS
+/// handshake to the provider plus JSON work on a starved core, and RAG needs two
+/// sequential model waves (decompose, then verify), so that cost is paid twice. A
+/// judge's first click is exactly that cold path.
+///
+/// This warms both the HTTPS connection pool and the response cache, so the demo
+/// buttons are instant. It's deliberately fire-and-forget: it must never delay
+/// startup or the health check, and a failure here is harmless (the next real
+/// request just pays the normal cost).
+async fn prewarm(client: Arc<ModelClient>) {
+    let t0 = std::time::Instant::now();
+
+    for (name, raw) in [("clean", DEMO_CLEAN), ("wrong_tool", DEMO_WRONG_TOOL)] {
+        match serde_json::from_str::<AgentTrace>(raw) {
+            Ok(trace) => {
+                client.score_agent_steps(&trace).await;
+                tracing::info!(demo = name, "prewarmed");
+            }
+            Err(e) => tracing::warn!(demo = name, error = %e, "prewarm parse failed"),
+        }
+    }
+    match serde_json::from_str::<RagTriple>(DEMO_RAG) {
+        Ok(triple) => match client.score_rag_triple(&triple).await {
+            Ok(_) => tracing::info!(demo = "rag_hallucination", "prewarmed"),
+            Err(e) => tracing::warn!(demo = "rag_hallucination", error = %e, "prewarm failed"),
+        },
+        Err(e) => tracing::warn!(demo = "rag_hallucination", error = %e, "prewarm parse failed"),
+    }
+
+    tracing::info!(ms = t0.elapsed().as_millis() as u64, "demo prewarm complete");
 }
 
 /// Liveness + config visibility. `model_layer` reports whether the explanation

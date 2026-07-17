@@ -217,7 +217,19 @@ impl ModelClient {
             http: Client::new(),
             fast,
             strong,
-            cache: ModelCache::new(1000, 3600),
+            // 6h, not the §8 baseline of 1h: the cache key is
+            // (check, model, normalized_input), so an entry is a pure function of its
+            // input — TTL is an eviction policy, not a correctness knob, and a stale
+            // answer is impossible (a different model or input is a different key).
+            // A longer window keeps the prewarmed demo fixtures hot across a judging
+            // session instead of expiring after an hour and re-paying the cold path.
+            cache: ModelCache::new(
+                1000,
+                std::env::var("JUDIX_CACHE_TTL_SECS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(21_600),
+            ),
             sem: Arc::new(Semaphore::new(MAX_CONCURRENCY)),
             // Empirically 0.6, not the spec's literal 0.5: Gemini expresses "I'm
             // unsure" as *exactly* 0.5 and never dips below it, so `< 0.5` never
