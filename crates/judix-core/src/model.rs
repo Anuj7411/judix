@@ -363,16 +363,52 @@ impl ModelClient {
             model: model_strong,
         };
 
-        // Failover chain: primary, escalation, then any extras. Deduped so a
-        // single-provider setup doesn't retry the same endpoint twice per attempt.
-        let mut pool = vec![fast.clone()];
-        for p in std::iter::once(strong.clone()).chain(Self::extra_providers()) {
+        // Failover chain, in priority order:
+        //   1. the configured primary + escalation
+        //   2. every OTHER free model on those same endpoints/keys (auto-expanded)
+        //   3. anything in JUDIX_EXTRA_PROVIDERS
+        // deduped by (base_url, model).
+        //
+        // Auto-expansion is the whole robustness story. Free quotas are per-model, so the
+        // two keys you already have unlock ~8 endpoints — but wiring that up used to mean
+        // pasting a long JSON blob into JUDIX_EXTRA_PROVIDERS, which a dashboard env editor
+        // silently truncated, leaving a 2-endpoint pool that went all-`na` under load. Here
+        // the pool is DERIVED from the keys already present, so there is no fragile config
+        // to mis-paste: set the two keys, get the whole pool. Opt out with
+        // JUDIX_AUTO_EXPAND=0.
+        let auto_expand = std::env::var("JUDIX_AUTO_EXPAND")
+            .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
+            .unwrap_or(true);
+
+        let mut pool: Vec<Provider> = Vec::new();
+        let push = |p: Provider, pool: &mut Vec<Provider>| {
             if !pool.iter().any(|q| q.same_as(&p)) {
                 pool.push(p);
             }
+        };
+        push(fast.clone(), &mut pool);
+        push(strong.clone(), &mut pool);
+        if auto_expand {
+            for base in [&fast, &strong] {
+                for model in Self::sibling_models(&base.base_url) {
+                    push(
+                        Provider {
+                            base_url: base.base_url.clone(),
+                            api_key: base.api_key.clone(),
+                            model: (*model).to_string(),
+                        },
+                        &mut pool,
+                    );
+                }
+            }
         }
+        for p in Self::extra_providers() {
+            push(p, &mut pool);
+        }
+
         tracing::info!(
             providers = pool.len(),
+            auto_expand,
             models = %pool.iter().map(|p| p.model.as_str()).collect::<Vec<_>>().join(", "),
             "model provider pool"
         );
@@ -423,6 +459,33 @@ impl ModelClient {
     /// lesson as the `commit` field: if you can't see it, you'll debug the wrong thing.
     pub fn pool_summary(&self) -> Vec<String> {
         self.pool.iter().map(|p| p.model.clone()).collect()
+    }
+
+    /// Free models known to work on a given OpenAI-compatible endpoint, used to
+    /// auto-expand the pool from a single key. Each has its **own** daily quota (free
+    /// tiers meter per model — Gemini's 429 literally says
+    /// `…PerProjectPerModel-FreeTier`), so listing siblings multiplies capacity from one
+    /// key. Verified reachable this session with a real key; an unknown endpoint returns
+    /// nothing and simply isn't expanded.
+    fn sibling_models(base_url: &str) -> &'static [&'static str] {
+        if base_url.contains("generativelanguage.googleapis.com") {
+            &[
+                "gemini-2.5-flash",
+                "gemini-flash-latest",
+                "gemini-3.1-flash-lite",
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-lite",
+            ]
+        } else if base_url.contains("api.groq.com") {
+            &[
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+            ]
+        } else {
+            &[]
+        }
     }
 
     /// Additional failover providers from `JUDIX_EXTRA_PROVIDERS`, a JSON array of

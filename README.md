@@ -211,9 +211,12 @@ one Groq key, at a moment when the two headline models were fully exhausted:
 | `llama-3.1-8b-instant` | ✅ 200 — **its own quota** |
 | `openai/gpt-oss-120b` | ✅ 200 — **its own quota** |
 
-So capacity is a **config** problem, not a billing one. `JUDIX_EXTRA_PROVIDERS` takes a
-JSON array of `{base_url, api_key, model}`; the pool is `[fast, strong, ...extras]`,
-deduped. On a `429` a call fails over to the next healthy endpoint, and a throttled one is
+So capacity comes from the keys you already have. Set the two — a Gemini key and a Groq
+key — and the pool **auto-expands** to every free model on each endpoint (Gemini and Groq
+each contribute ~4-5 models, ~9 endpoints total). No extra config, nothing fragile to
+paste. `JUDIX_EXTRA_PROVIDERS` (a JSON array of `{base_url, api_key, model}`) can add more
+endpoints for other providers; `JUDIX_AUTO_EXPAND=0` turns expansion off. The pool is
+`[fast, strong, ...auto-expanded siblings, ...extras]`, deduped, and shown on `/health`. On a `429` a call fails over to the next healthy endpoint, and a throttled one is
 put in a 45s cooldown so it stops being tried first. Verified end-to-end on a day when
 both primaries were dead: `wrong_tool → 20.6 red`, `rag → 49.0 red`, cascading
 `gemini-2.5-flash → … → openai/gpt-oss-120b`.
