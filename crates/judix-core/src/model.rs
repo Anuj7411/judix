@@ -27,12 +27,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
-/// Cap on in-flight model calls. Free tiers are strict (Gemini free ≈ 5 req/min),
-/// so we don't blast every step's calls at once — a small pool plus retry keeps
-/// us under the limit instead of eating a wall of 429s.
-const MAX_CONCURRENCY: usize = 3;
+/// Cap on in-flight model calls.
+///
+/// Measured, not guessed. The ~5/min figure is specific to `gemini-2.5-flash`;
+/// `gemini-3.1-flash-lite` served 14/14 concurrent trivial requests with zero 429s,
+/// and Groq's own headers report 1000 req/day + 12k tokens/min. But a *real* load of
+/// full-size traces does throttle 3.1-flash-lite, so concurrency alone isn't the
+/// answer — `chat` fails over to the second provider on 429. A 5-step trace fires 10
+/// calls, so 8 sends a whole trace in ~2 waves while bounding a pathological input.
+const MAX_CONCURRENCY: usize = 8;
 /// How many times to retry a 429/503 before giving up on a single call.
 const MAX_RETRIES: u32 = 4;
+/// Ceiling on any single backoff sleep.
+const MAX_BACKOFF_MS: u64 = 12_000;
 
 /// One OpenAI-compatible endpoint (base URL + key + model name).
 #[derive(Clone)]
@@ -105,6 +112,13 @@ struct Usage {
 struct ChatOut {
     text: String,
     cost_usd: f64,
+}
+
+/// Why a single attempt failed. `Throttled` is recoverable — we fail over to the
+/// other provider (separate quota) rather than sleeping on a busy one.
+enum CallErr {
+    Throttled { retry_ms: Option<u64> },
+    Other(String),
 }
 
 // --- Strict structured-output types ---------------------------------------
@@ -231,28 +245,16 @@ impl ModelClient {
         }
     }
 
-    /// One chat call against a specific provider. Requests a JSON object via
-    /// `response_format`, caches by `(check, model, input)`, and computes cost
-    /// from token usage. A cache hit returns instantly at $0.
-    async fn chat(
+    /// A single attempt against one provider. No retries, no cache — the caller
+    /// (`chat`) owns the failover/backoff policy.
+    async fn chat_once(
         &self,
         provider: &Provider,
         check: &str,
         system: &str,
         user: &str,
-    ) -> Result<ChatOut, String> {
-        let cache_input = format!("{system}\n---\n{user}");
-        if let Some(cached) = self.cache.get(check, &provider.model, &cache_input).await {
-            return Ok(ChatOut {
-                text: cached,
-                cost_usd: 0.0,
-            });
-        }
-
-        let url = format!(
-            "{}/chat/completions",
-            provider.base_url.trim_end_matches('/')
-        );
+    ) -> Result<ChatOut, CallErr> {
+        let url = format!("{}/chat/completions", provider.base_url.trim_end_matches('/'));
         let body = json!({
             "model": provider.model,
             "messages": [
@@ -267,67 +269,162 @@ impl ModelClient {
             "response_format": { "type": "json_object" }
         });
 
-        // Retry loop for rate limits (429) and transient overload (503). Each
-        // attempt takes a concurrency permit only for the duration of the request,
-        // releasing it while backing off so other calls can proceed.
-        let mut attempt = 0u32;
-        let res = loop {
-            let permit = self.sem.acquire().await.map_err(|e| e.to_string())?;
-            let sent = self
-                .http
-                .post(&url)
-                .header("Content-Type", "application/json")
-                .header("Authorization", format!("Bearer {}", provider.api_key))
-                .json(&body)
-                .send()
-                .await;
-            drop(permit);
+        let permit = self
+            .sem
+            .acquire()
+            .await
+            .map_err(|e| CallErr::Other(e.to_string()))?;
+        let call_start = std::time::Instant::now();
+        let sent = self
+            .http
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", provider.api_key))
+            .json(&body)
+            .send()
+            .await;
+        drop(permit);
 
-            match sent {
-                Ok(r) if r.status().is_success() => break r,
-                Ok(r) if (r.status() == 429 || r.status() == 503) && attempt < MAX_RETRIES => {
-                    let delay = Self::retry_after(&r).unwrap_or(2u64.pow(attempt + 1) * 2);
-                    tokio::time::sleep(Duration::from_secs(delay.min(20))).await;
-                    attempt += 1;
-                    continue;
-                }
-                Ok(r) => {
-                    let status = r.status();
-                    let text = r.text().await.unwrap_or_default();
-                    let short: String = text.chars().take(200).collect();
-                    return Err(format!("model API {status}: {short}"));
-                }
-                Err(_e) if attempt < MAX_RETRIES => {
-                    tokio::time::sleep(Duration::from_secs(2u64.pow(attempt + 1))).await;
-                    attempt += 1;
-                    continue;
-                }
-                Err(e) => return Err(e.to_string()),
-            }
+        let res = match sent {
+            Ok(r) => r,
+            Err(e) => return Err(CallErr::Other(e.to_string())),
         };
 
-        let chat: ChatResponse = res.json().await.map_err(|e| e.to_string())?;
+        if res.status() == 429 || res.status() == 503 {
+            let header_hint = Self::retry_after_header(&res);
+            let status = res.status().as_u16();
+            let text = res.text().await.unwrap_or_default();
+            // Gemini puts its hint in the BODY ("retryDelay": "11s"), not in a
+            // Retry-After header — reading only the header made us retry after
+            // 250ms against an 11s cooldown and burn every attempt.
+            let retry_ms = header_hint.or_else(|| Self::retry_delay_body(&text));
+            tracing::warn!(check, model = %provider.model, status, ?retry_ms, "provider throttled");
+            return Err(CallErr::Throttled { retry_ms });
+        }
+        if !res.status().is_success() {
+            let status = res.status();
+            let text = res.text().await.unwrap_or_default();
+            let short: String = text.chars().take(200).collect();
+            return Err(CallErr::Other(format!("model API {status}: {short}")));
+        }
+
+        let chat: ChatResponse = res.json().await.map_err(|e| CallErr::Other(e.to_string()))?;
         let text = chat.choices.first().map(|c| c.message.text()).unwrap_or_default();
         let usage = chat.usage.unwrap_or_default();
         let (rin, rout) = Self::rate(&provider.model);
-        let cost_usd = (usage.prompt_tokens as f64 * rin + usage.completion_tokens as f64 * rout)
-            / 1_000_000.0;
-
-        self.cache
-            .insert(check, &provider.model, &cache_input, text.clone())
-            .await;
+        let cost_usd =
+            (usage.prompt_tokens as f64 * rin + usage.completion_tokens as f64 * rout) / 1_000_000.0;
+        tracing::debug!(
+            check, model = %provider.model, ms = call_start.elapsed().as_millis() as u64,
+            "model call ok"
+        );
         Ok(ChatOut { text, cost_usd })
     }
 
-    /// Seconds to wait per the `Retry-After` header, if present and numeric.
-    fn retry_after(res: &reqwest::Response) -> Option<u64> {
-        res.headers()
+    /// Run `check` against `primary`, **failing over to `secondary` the moment
+    /// `primary` throttles**, and only backing off if both are busy.
+    ///
+    /// The two providers hold independent quotas (Gemini and Groq), so a 429 on one
+    /// is not a reason to sleep — it's a reason to use the other. Sleeping on a busy
+    /// provider while a second key sat idle is what exhausted the retry budget and
+    /// dropped metrics to `na` under load.
+    ///
+    /// Cached under `primary.model` regardless of which provider actually answered:
+    /// the cache key is the *logical route* (check + input), and either provider's
+    /// answer is a valid response to the same question.
+    async fn chat(
+        &self,
+        primary: &Provider,
+        secondary: &Provider,
+        check: &str,
+        system: &str,
+        user: &str,
+    ) -> Result<ChatOut, String> {
+        let cache_input = format!("{system}\n---\n{user}");
+        if let Some(cached) = self.cache.get(check, &primary.model, &cache_input).await {
+            return Ok(ChatOut { text: cached, cost_usd: 0.0 });
+        }
+
+        let mut last_err = String::from("no attempt made");
+        for attempt in 0..=MAX_RETRIES {
+            let mut throttle_hint: Option<u64> = None;
+
+            for (idx, provider) in [primary, secondary].into_iter().enumerate() {
+                // Skip the duplicate call when both roles point at one provider.
+                if idx == 1 && secondary.model == primary.model && secondary.base_url == primary.base_url {
+                    continue;
+                }
+                match self.chat_once(provider, check, system, user).await {
+                    Ok(out) => {
+                        if idx == 1 {
+                            tracing::info!(check, from = %primary.model, to = %provider.model,
+                                "failed over to secondary provider");
+                        }
+                        self.cache
+                            .insert(check, &primary.model, &cache_input, out.text.clone())
+                            .await;
+                        return Ok(out);
+                    }
+                    Err(CallErr::Throttled { retry_ms }) => {
+                        throttle_hint = throttle_hint.or(retry_ms);
+                        continue; // try the other provider before sleeping
+                    }
+                    Err(CallErr::Other(e)) => {
+                        last_err = e;
+                        continue;
+                    }
+                }
+            }
+
+            // Both providers unavailable — now a wait is actually warranted. Honor
+            // the provider's own hint when it gave one, else exponential backoff.
+            if attempt < MAX_RETRIES {
+                let delay = throttle_hint.unwrap_or_else(|| Self::backoff_ms(attempt));
+                tracing::warn!(check, attempt, delay_ms = delay, "all providers busy — backing off");
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+        }
+        Err(format!("all providers exhausted after {MAX_RETRIES} retries: {last_err}"))
+    }
+
+    /// Milliseconds to wait per the `Retry-After` header (sent in seconds).
+    fn retry_after_header(res: &reqwest::Response) -> Option<u64> {
+        let secs: u64 = res
+            .headers()
             .get(reqwest::header::RETRY_AFTER)?
             .to_str()
             .ok()?
             .trim()
-            .parse::<u64>()
-            .ok()
+            .parse()
+            .ok()?;
+        Some((secs * 1000).min(MAX_BACKOFF_MS))
+    }
+
+    /// Pull Gemini's `"retryDelay": "11s"` out of a 429 body.
+    fn retry_delay_body(body: &str) -> Option<u64> {
+        let at = body.find("retryDelay")?;
+        let rest = &body[at..];
+        let start = rest.find(':')?;
+        let seg: String = rest[start..]
+            .chars()
+            .skip_while(|c| !c.is_ascii_digit())
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let secs: f64 = seg.parse().ok()?;
+        Some(((secs * 1000.0) as u64).min(MAX_BACKOFF_MS))
+    }
+
+    /// Backoff for attempt N, in milliseconds: 250, 500, 1000, 2000 … capped.
+    ///
+    /// Deliberately sub-second to start. A seconds-scale ladder (4/8/16/20s) turns
+    /// one transient 503 into ~48s of sleeping and dominates the whole request —
+    /// which is exactly what made a 10-call trace take 52s despite the provider
+    /// having ample quota. Jitter (derived from the attempt, not a clock, to keep
+    /// scoring reproducible) avoids retry convoys when a wave throttles together.
+    fn backoff_ms(attempt: u32) -> u64 {
+        let base = 250u64 << attempt.min(5);
+        let jitter = (attempt as u64 * 37) % 100;
+        (base + jitter).min(MAX_BACKOFF_MS)
     }
 
     /// Tolerant JSON extraction → strict serde. Tries raw parse, ```json fences,
@@ -366,7 +463,7 @@ impl ModelClient {
         system: &str,
         user: &str,
     ) -> (MetricResult, f64) {
-        let (fast_out, mut cost) = match self.chat(&self.fast, check, system, user).await {
+        let (fast_out, mut cost) = match self.chat(&self.fast, &self.strong, check, system, user).await {
             Ok(o) => (Self::parse::<ScoreOut>(&o.text), o.cost_usd),
             Err(e) => {
                 return (
@@ -390,7 +487,7 @@ impl ModelClient {
 
         // Escalate low-confidence fast results to the strong model.
         if (fast.confidence as f32) < self.escalate_below {
-            if let Ok(o) = self.chat(&self.strong, check, system, user).await {
+            if let Ok(o) = self.chat(&self.strong, &self.fast, check, system, user).await {
                 cost += o.cost_usd;
                 if let Some(strong) = Self::parse::<ScoreOut>(&o.text) {
                     let mut m = MetricResult::model(
@@ -481,7 +578,7 @@ impl ModelClient {
             the answer it is drawn from (copied character-for-character, no paraphrasing). \
             Respond ONLY as JSON {\"claims\":[{\"id\":1,\"text\":\"...\",\"quote\":\"...\"}]}.";
         let out = self
-            .chat(&self.fast, "rag_decompose", system, &format!("ANSWER:\n{answer}"))
+            .chat(&self.fast, &self.strong, "rag_decompose", system, &format!("ANSWER:\n{answer}"))
             .await?;
         let parsed: ClaimsOut = Self::parse(&out.text)
             .ok_or_else(|| format!("unparseable decomposition: {}", out.text))?;
@@ -527,7 +624,7 @@ impl ModelClient {
             .join("\n");
         let user = format!("CONTEXTS:\n{ctx}\n\nCLAIMS:\n{claim_list}");
 
-        let out = self.chat(&self.fast, "rag_verify", system, &user).await?;
+        let out = self.chat(&self.fast, &self.strong, "rag_verify", system, &user).await?;
         let parsed: VerifyOut = Self::parse(&out.text)
             .ok_or_else(|| format!("unparseable verification: {}", out.text))?;
 
