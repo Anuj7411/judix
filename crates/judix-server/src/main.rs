@@ -1,15 +1,19 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::sse::{Event, KeepAlive, Sse},
     response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
-use judix_core::model::ModelClient;
+use futures::{Stream, StreamExt};
+use judix_core::model::{ModelClient, RagEvent};
 use judix_core::scoring::{score_agent, score_rag};
-use judix_core::types::{AgentTrace, RagTriple};
+use judix_core::types::{AgentTrace, MetricResult, RagTriple};
 use serde_json::{json, Value};
+use std::convert::Infallible;
 use std::sync::Arc;
+use std::time::Duration;
 
 const INDEX_HTML: &str = include_str!("../../../web/index.html");
 const DEMO_CLEAN: &str = include_str!("../../../demos/clean.json");
@@ -40,6 +44,11 @@ pub fn build_app() -> Router {
         .route("/api", get(api_info))
         .route("/score/agent", post(score_agent_handler))
         .route("/score/rag", post(score_rag_handler))
+        // Streaming variants (§9.5). Kept as separate routes rather than content
+        // negotiation on the existing paths, so the documented JSON API — the CLI,
+        // scripts/stress.sh, every curl in the README — keeps working untouched.
+        .route("/score/agent/stream", post(score_agent_stream))
+        .route("/score/rag/stream", post(score_rag_stream))
         .route("/demo/{id}", get(demo_handler))
         .with_state(state)
 }
@@ -58,6 +67,12 @@ pub fn build_app() -> Router {
 /// startup or the health check, and a failure here is harmless (the next real
 /// request just pays the normal cost).
 async fn prewarm(client: Arc<ModelClient>) {
+    // Pace between fixtures. Each agent demo fires 10 concurrent calls, so warming all
+    // three back-to-back burst ~25 requests and rate-limited *itself* — the RAG demo ran
+    // last and lost, failing to warm at all, which left the money demo cold for the very
+    // first judge. Nothing is waiting on this task, so spending a minute is free.
+    const GAP: Duration = Duration::from_secs(8);
+
     let t0 = std::time::Instant::now();
 
     for (name, raw) in [("clean", DEMO_CLEAN), ("wrong_tool", DEMO_WRONG_TOOL)] {
@@ -68,12 +83,26 @@ async fn prewarm(client: Arc<ModelClient>) {
             }
             Err(e) => tracing::warn!(demo = name, error = %e, "prewarm parse failed"),
         }
+        tokio::time::sleep(GAP).await;
     }
+
     match serde_json::from_str::<RagTriple>(DEMO_RAG) {
-        Ok(triple) => match client.score_rag_triple(&triple).await {
-            Ok(_) => tracing::info!(demo = "rag_hallucination", "prewarmed"),
-            Err(e) => tracing::warn!(demo = "rag_hallucination", error = %e, "prewarm failed"),
-        },
+        Ok(triple) => {
+            // Retry once after a longer pause: this is the RAG money demo, and a cold
+            // first click on it costs ~13s.
+            for attempt in 0..2 {
+                match client.score_rag_triple(&triple).await {
+                    Ok(_) => {
+                        tracing::info!(demo = "rag_hallucination", "prewarmed");
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!(demo = "rag_hallucination", attempt, error = %e, "prewarm failed");
+                        tokio::time::sleep(GAP * 2).await;
+                    }
+                }
+            }
+        }
         Err(e) => tracing::warn!(demo = "rag_hallucination", error = %e, "prewarm parse failed"),
     }
 
@@ -155,6 +184,126 @@ async fn score_rag_handler(
             Json(json!({ "error": format!("model error: {e}") })),
         ),
     }
+}
+
+// ---------------------------------------------------------------------------
+// SSE streaming (§9.5)
+// ---------------------------------------------------------------------------
+//
+// The product claim is "real-time": the deterministic engine has an answer in ~1ms, but
+// the JSON endpoints hold it hostage until the slowest model call returns. Streaming
+// lets the part that costs $0 and needs no network paint immediately, with each model
+// explanation layering in as it arrives.
+//
+// Event protocol (each `data:` is one JSON object):
+//   event: deterministic  → a complete AgentReport from the engine alone. Render it NOW.
+//   event: metric         → {step_index, metric} — one model metric that just landed.
+//   event: claims         → {claims:[…]} — RAG only: decomposed claims + spans.
+//   event: done           → the final recomposed report (weights + hard caps applied).
+//   event: error          → {message} — terminal.
+//
+// Client note: browsers cannot POST with `EventSource`, so consume this with `fetch()`
+// + a ReadableStream reader, not `new EventSource(...)`.
+
+/// Serialize a value into an SSE event, degrading to an `error` event rather than
+/// killing the stream.
+fn sse_event(name: &str, value: &Value) -> Event {
+    match Event::default().event(name).json_data(value) {
+        Ok(e) => e,
+        Err(e) => Event::default()
+            .event("error")
+            .data(json!({ "message": format!("serialize {name}: {e}") }).to_string()),
+    }
+}
+
+/// Stream an agent score: deterministic metrics first, model metrics as they land.
+async fn score_agent_stream(
+    State(state): State<AppState>,
+    Json(trace): Json<AgentTrace>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = async_stream::stream! {
+        let t0 = std::time::Instant::now();
+
+        // 1. The hero: real scores, zero model calls, ~1ms — on screen before any
+        //    network round-trip has even started.
+        let det = score_agent(&trace, &[], t0.elapsed().as_millis() as u64, 0.0);
+        yield Ok(sse_event("deterministic", &json!(det)));
+
+        let Some(client) = state.model.clone() else {
+            // Keyless: the deterministic report IS the final report.
+            yield Ok(sse_event("done", &json!(det)));
+            return;
+        };
+
+        // 2. Model metrics, emitted in completion order (not step order).
+        let mut per_step: Vec<Vec<MetricResult>> = vec![Vec::new(); trace.steps.len()];
+        let mut cost = 0.0f64;
+        let metrics = client.stream_agent_metrics(&trace);
+        futures::pin_mut!(metrics);
+        while let Some((step_index, metric, c)) = metrics.next().await {
+            cost += c;
+            yield Ok(sse_event("metric", &json!({
+                "step_index": step_index,
+                "metric": metric,
+            })));
+            if let Some(slot) = per_step.get_mut(step_index) {
+                slot.push(metric);
+            }
+        }
+
+        // 3. Recompose with the model metrics included so weights and hard caps apply to
+        //    the full picture — streamed metrics are individual facts, this is the verdict.
+        let full = score_agent(&trace, &per_step, t0.elapsed().as_millis() as u64, cost);
+        yield Ok(sse_event("done", &json!(full)));
+    };
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+/// Stream a RAG score. There are no deterministic RAG metrics to lead with (the
+/// faithfulness *ratio* is computed in Rust, but only from model verdicts), so this
+/// emits the claim decomposition as soon as it exists — a judge sees the answer broken
+/// into claims and spans before the composite verdict is assembled.
+async fn score_rag_stream(
+    State(state): State<AppState>,
+    Json(triple): Json<RagTriple>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = async_stream::stream! {
+        let t0 = std::time::Instant::now();
+
+        let Some(client) = state.model.clone() else {
+            yield Ok(sse_event("error", &json!({
+                "status": "model_required",
+                "message": "RAG scoring needs the model layer. Set JUDIX_BASE_URL and JUDIX_API_KEY.",
+            })));
+            return;
+        };
+
+        let events = client.stream_rag(&triple);
+        futures::pin_mut!(events);
+        while let Some(ev) = events.next().await {
+            match ev {
+                RagEvent::Claims(claims) => {
+                    yield Ok(sse_event("claims", &json!({ "claims": claims })));
+                }
+                RagEvent::Metric(m) => {
+                    yield Ok(sse_event("metric", &json!({ "metric": m })));
+                }
+                RagEvent::Done { metrics, spans, any_contradiction, cost } => {
+                    let report = score_rag(
+                        metrics, spans, any_contradiction,
+                        t0.elapsed().as_millis() as u64, cost,
+                    );
+                    yield Ok(sse_event("done", &json!(report)));
+                }
+                RagEvent::Error(e) => {
+                    yield Ok(sse_event("error", &json!({ "message": e })));
+                }
+            }
+        }
+    };
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 async fn demo_handler(Path(id): Path<String>) -> impl IntoResponse {

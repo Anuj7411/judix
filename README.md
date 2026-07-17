@@ -103,6 +103,8 @@ To enable the model layer, set the env vars below and restart. `GET /health` rep
 | `GET` | `/api` | — | machine-readable endpoint list |
 | `POST` | `/score/agent` | `AgentTrace` | `AgentReport` — `{run_quality, band, steps[], latency_ms, model_cost_usd, deterministic_share}` |
 | `POST` | `/score/rag` | `RagTriple` | `RagReport` — `{rag_quality, band, metrics[], unsupported_spans[], latency_ms, model_cost_usd}` |
+| `POST` | `/score/agent/stream` | `AgentTrace` | **SSE** — deterministic report first, model metrics as they land |
+| `POST` | `/score/rag/stream` | `RagTriple` | **SSE** — claims first, then metrics |
 | `GET` | `/demo/{id}` | — | fixture: `clean` \| `wrong_tool` \| `rag_hallucination` |
 
 `AgentTrace` = `{goal, steps[{kind, name?, args?, result?, content?}], expected_tools?, tool_schemas?}`
@@ -110,6 +112,31 @@ To enable the model layer, set the env vars below and restart. `GET /health` rep
 
 `POST /score/agent` works with **no key** (deterministic metrics only; model metrics come back `na`).
 `POST /score/rag` needs the model layer and returns `501 model_required` without it.
+
+### Streaming (SSE)
+
+The deterministic engine has an answer in ~1ms, but the JSON endpoints hold it until the
+slowest model call returns. The streaming routes emit the free, instant part first:
+
+| Event | Payload | When |
+|---|---|---|
+| `deterministic` | a full `AgentReport` from the engine alone | **~1ms** — render immediately |
+| `metric` | `{step_index, metric}` (agent) or `{metric}` (RAG) | as each model check lands |
+| `claims` | `{claims:[{start,end,text}]}` — RAG only, no verdicts yet | after decomposition |
+| `done` | the final report (weights + hard caps applied) | when every check is in |
+| `error` | `{message}` | terminal |
+
+Measured on `wrong_tool` (5 steps, 10 model calls): **first paint 133ms vs 3534ms** for the
+whole run — a real score on screen 26× sooner. Model metrics arrive in *completion* order,
+not step order, so the fastest explanations show up first.
+
+```bash
+curl -N -X POST http://localhost:8000/score/agent/stream \
+  -H 'content-type: application/json' --data-binary @demos/wrong_tool.json
+```
+
+> **Client note:** browsers cannot `POST` with `EventSource`, so consume these with
+> `fetch()` + a `ReadableStream` reader — not `new EventSource(...)`.
 
 ---
 

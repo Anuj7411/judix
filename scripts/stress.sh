@@ -51,6 +51,22 @@ for f in "$TMP"/*; do cat "$f"; grep -q "FAIL" "$f" && FAILS=$((FAILS+1)); done
 rm -rf "$TMP"
 
 echo ""
+echo "=== ROUND 4: SSE (deterministic must arrive BEFORE done, not with it) ==="
+sse_check() { # $1=endpoint $2=file $3=first_expected_event $4=label
+  local out
+  out=$(curl -N -s "http://localhost:8000/$1" -H "Content-Type: application/json" -d @"$2" --max-time 240 \
+        | grep '^event:' | sed 's/event: *//' | tr '\n' ' ')
+  local first="${out%% *}"
+  if [ "$first" = "$3" ] && echo "$out" | grep -q "done"; then
+    echo "  PASS $4: $out"; return 0
+  else
+    echo "  FAIL $4: expected first='$3' then done — got: $out"; return 1
+  fi
+}
+sse_check score/agent/stream demos/wrong_tool.json deterministic "agent SSE" || FAILS=$((FAILS+1))
+sse_check score/rag/stream   demos/rag_hallucination.json claims     "rag SSE"   || FAILS=$((FAILS+1))
+
+echo ""
 echo "==================================="
-if [ "$FAILS" -eq 0 ]; then echo "ALL PASS — 12/12 checks hit expected band with zero dropped metrics"; else echo "$FAILS CHECK(S) FAILED"; fi
+if [ "$FAILS" -eq 0 ]; then echo "ALL PASS — 14/14 checks (12 scoring + 2 SSE), zero dropped metrics"; else echo "$FAILS CHECK(S) FAILED"; fi
 echo "==================================="

@@ -16,10 +16,19 @@ reqwest = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
+async-stream = { version = "0.3", optional = true }
 
 [features]
 default = []
-model = ["dep:sha2", "dep:moka", "dep:reqwest", "dep:futures", "dep:tokio", "dep:tracing"]
+model = [
+    "dep:sha2",
+    "dep:moka",
+    "dep:reqwest",
+    "dep:futures",
+    "dep:tokio",
+    "dep:tracing",
+    "dep:async-stream",
+]
 
 [dev-dependencies]
 serde_json = { workspace = true }

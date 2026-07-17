@@ -19,9 +19,10 @@
 use crate::cache::ModelCache;
 use crate::deterministic;
 use crate::types::{AgentTrace, ClaimSpan, MetricResult, MetricSource, RagTriple};
+use futures::future;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,6 +41,35 @@ const MAX_CONCURRENCY: usize = 8;
 const MAX_RETRIES: u32 = 4;
 /// Ceiling on any single backoff sleep.
 const MAX_BACKOFF_MS: u64 = 12_000;
+
+/// §7.2 — judge one step against the goal, including constraints encoded in tool args.
+const REL_SYS: &str = "You evaluate ONE step of an AI agent's trajectory against the user's GOAL. \
+    The goal may contain explicit constraints (e.g. 'avoiding downtown'). Rate how relevant \
+    and necessary this step is to achieving the goal. HEAVILY penalize any step that violates \
+    an explicit constraint in the goal, and penalize steps that make no progress. \
+    Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
+    100 = essential and compliant, 50 = tangential, 0 = irrelevant or constraint-violating.";
+
+/// §7.3 — judge the trajectory so far against the original goal.
+const DRIFT_SYS: &str = "You evaluate whether an AI agent is still pursuing its ORIGINAL GOAL given \
+    the TRAJECTORY so far. Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
+    100 = fully on the original goal, 0 = fully drifted or abandoned. Penalize repeated \
+    no-progress actions and constraint violations.";
+
+/// §7.5 — does the answer address the question?
+const AR_SYS: &str = "Rate how directly the ANSWER addresses the QUESTION. Respond ONLY as JSON \
+    {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. 100 = fully answers, 0 = off-topic.";
+
+/// §7.5 — signal-to-noise of the retrieved contexts.
+const CP_SYS: &str = "Given the QUESTION, the retrieved CONTEXTS, and the ANSWER, rate the signal-to-noise \
+    of the contexts: what fraction are actually relevant/necessary to answer the question. \
+    Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
+    100 = all contexts relevant, 0 = all noise.";
+
+/// §7.5 — do the contexts contain everything the answer needs?
+const CR_SYS: &str = "Given the QUESTION, the CONTEXTS, and the ANSWER, rate context recall: do the contexts \
+    contain all the information needed to support the answer? Respond ONLY as JSON \
+    {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. 100 = fully covered, 0 = key info missing.";
 
 /// One OpenAI-compatible endpoint (base URL + key + model name).
 #[derive(Clone)]
@@ -169,6 +199,33 @@ struct VerifyItem {
     /// evidence, and treated as a critical failure by `score_rag`.
     #[serde(default)]
     status: String,
+}
+
+/// A decomposed claim before any grounding verdict exists, with its char-span in the
+/// answer. Deliberately carries no `supported`/`contradicted` flag: emitting a claim
+/// early with `supported: false` would render it red before it had been checked.
+#[derive(Debug, Clone, Serialize)]
+pub struct PendingClaim {
+    pub start: usize,
+    pub end: usize,
+    pub text: String,
+}
+
+/// Incremental RAG scoring events (§9.5), in emission order.
+pub enum RagEvent {
+    /// The answer split into claims + spans. Available a full wave before any verdict.
+    Claims(Vec<PendingClaim>),
+    /// One metric landed.
+    Metric(MetricResult),
+    /// Terminal: everything needed to compose the final report.
+    Done {
+        metrics: Vec<MetricResult>,
+        spans: Vec<ClaimSpan>,
+        any_contradiction: bool,
+        cost: f64,
+    },
+    /// Terminal.
+    Error(String),
 }
 
 /// Grounding verdict for one claim.
@@ -358,7 +415,8 @@ impl ModelClient {
             return Ok(ChatOut { text: cached, cost_usd: 0.0 });
         }
 
-        let mut last_err = String::from("no attempt made");
+        let mut last_err: Option<String> = None;
+        let mut throttled = false;
         for attempt in 0..=MAX_RETRIES {
             let mut throttle_hint: Option<u64> = None;
 
@@ -379,11 +437,12 @@ impl ModelClient {
                         return Ok(out);
                     }
                     Err(CallErr::Throttled { retry_ms }) => {
+                        throttled = true;
                         throttle_hint = throttle_hint.or(retry_ms);
                         continue; // try the other provider before sleeping
                     }
                     Err(CallErr::Other(e)) => {
-                        last_err = e;
+                        last_err = Some(e);
                         continue;
                     }
                 }
@@ -397,7 +456,16 @@ impl ModelClient {
                 tokio::time::sleep(Duration::from_millis(delay)).await;
             }
         }
-        Err(format!("all providers exhausted after {MAX_RETRIES} retries: {last_err}"))
+        // Report what actually happened. A pure-throttle exhaustion used to surface as
+        // "no attempt made" (the untouched default of last_err), which is the opposite
+        // of the truth and sent me hunting the wrong bug.
+        Err(match (last_err, throttled) {
+            (Some(e), _) => format!("all providers failed after {MAX_RETRIES} retries: {e}"),
+            (None, true) => {
+                format!("all providers rate-limited after {MAX_RETRIES} retries")
+            }
+            (None, false) => format!("all providers unavailable after {MAX_RETRIES} retries"),
+        })
     }
 
     /// Milliseconds to wait per the `Retry-After` header (sent in seconds).
@@ -524,13 +592,14 @@ impl ModelClient {
     // Agent checks (§7.2 / §7.3)
     // ------------------------------------------------------------------
 
-    /// Score `step_relevance` + `goal_drift` for every step, all model calls fired
-    /// concurrently. Returns per-step metrics and total model $.
-    pub async fn score_agent_steps(&self, trace: &AgentTrace) -> (Vec<Vec<MetricResult>>, f64) {
-        // Precompute each step's description and the trajectory prefix up to it
-        // (synchronous — no ordering constraint on the async calls).
+    /// Render each step as `(step_description, trajectory_prefix)`.
+    ///
+    /// Synchronous and cheap, so the async calls that follow have no ordering
+    /// constraint between them: `goal_drift` needs only the trajectory *prefix*, which
+    /// is fully determined here.
+    fn prepare_steps(trace: &AgentTrace) -> Vec<(String, String)> {
         let mut trajectory = String::new();
-        let mut prepared: Vec<(String, String)> = Vec::with_capacity(trace.steps.len());
+        let mut prepared = Vec::with_capacity(trace.steps.len());
         for (i, step) in trace.steps.iter().enumerate() {
             let name = step.name.clone().unwrap_or_else(|| step.kind.clone());
             // Include tool-call args so the judge can see WHAT was called (e.g.
@@ -551,24 +620,20 @@ impl ModelClient {
             trajectory.push_str(&format!("Step {i}: {step_desc}\n"));
             prepared.push((step_desc, trajectory.clone()));
         }
+        prepared
+    }
 
-        let rel_sys = "You evaluate ONE step of an AI agent's trajectory against the user's GOAL. \
-            The goal may contain explicit constraints (e.g. 'avoiding downtown'). Rate how relevant \
-            and necessary this step is to achieving the goal. HEAVILY penalize any step that violates \
-            an explicit constraint in the goal, and penalize steps that make no progress. \
-            Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
-            100 = essential and compliant, 50 = tangential, 0 = irrelevant or constraint-violating.";
-        let drift_sys = "You evaluate whether an AI agent is still pursuing its ORIGINAL GOAL given \
-            the TRAJECTORY so far. Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
-            100 = fully on the original goal, 0 = fully drifted or abandoned. Penalize repeated \
-            no-progress actions and constraint violations.";
+    /// Score `step_relevance` + `goal_drift` for every step, all model calls fired
+    /// concurrently. Returns per-step metrics and total model $.
+    pub async fn score_agent_steps(&self, trace: &AgentTrace) -> (Vec<Vec<MetricResult>>, f64) {
+        let prepared = Self::prepare_steps(trace);
 
         let futures = prepared.iter().map(|(step_desc, traj)| async move {
             let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
             let drift_user = format!("ORIGINAL GOAL: {}\n\nTRAJECTORY SO FAR:\n{traj}", trace.goal);
             let ((rel, c1), (drift, c2)) = futures::future::join(
-                self.scored_check("step_relevance", rel_sys, &rel_user),
-                self.scored_check("goal_drift", drift_sys, &drift_user),
+                self.scored_check("step_relevance", REL_SYS, &rel_user),
+                self.scored_check("goal_drift", DRIFT_SYS, &drift_user),
             )
             .await;
             (vec![rel, drift], c1 + c2)
@@ -578,6 +643,37 @@ impl ModelClient {
         let cost = results.iter().map(|(_, c)| c).sum();
         let metrics = results.into_iter().map(|(m, _)| m).collect();
         (metrics, cost)
+    }
+
+    /// Same checks as [`score_agent_steps`], but yielded **as each one lands** rather
+    /// than after the whole wave (§9.5).
+    ///
+    /// `score_agent_steps` waits on `join_all`, so the caller blocks for the slowest
+    /// call. That's fine for the JSON API, which has one response to fill. For SSE the
+    /// whole point is that a judge sees each explanation the instant it arrives, on top
+    /// of deterministic metrics that were already on screen in ~1ms. `FuturesUnordered`
+    /// polls every call concurrently and completes them out of order, so the stream is
+    /// ordered by *latency*, not by step index — each item carries its own `step_index`.
+    pub fn stream_agent_metrics<'a>(
+        &'a self,
+        trace: &'a AgentTrace,
+    ) -> impl futures::Stream<Item = (usize, MetricResult, f64)> + 'a {
+        let prepared = Self::prepare_steps(trace);
+        let futs = futures::stream::FuturesUnordered::new();
+
+        for (i, (step_desc, traj)) in prepared.into_iter().enumerate() {
+            let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
+            futs.push(future::Either::Left(async move {
+                let (m, c) = self.scored_check("step_relevance", REL_SYS, &rel_user).await;
+                (i, m, c)
+            }));
+            let drift_user = format!("ORIGINAL GOAL: {}\n\nTRAJECTORY SO FAR:\n{traj}", trace.goal);
+            futs.push(future::Either::Right(async move {
+                let (m, c) = self.scored_check("goal_drift", DRIFT_SYS, &drift_user).await;
+                (i, m, c)
+            }));
+        }
+        futs
     }
 
     // ------------------------------------------------------------------
@@ -652,6 +748,83 @@ impl ModelClient {
         Ok((statuses, out.cost_usd))
     }
 
+    /// Same work as [`score_rag_triple`], but emitted incrementally (§9.5).
+    ///
+    /// RAG has no deterministic metric to lead with — the faithfulness *ratio* is
+    /// computed in Rust, but only from model verdicts, so there is nothing to show at
+    /// 1ms the way the agent path can. What it does have is a natural seam: claims
+    /// exist after the decompose wave, a full wave before any grounding verdict. So
+    /// emit them, letting the UI paint the answer broken into spans while the checks
+    /// are still running, instead of holding everything until the last one lands.
+    pub fn stream_rag<'a>(
+        &'a self,
+        triple: &'a RagTriple,
+    ) -> impl futures::Stream<Item = RagEvent> + 'a {
+        async_stream::stream! {
+            // Wave 1: decompose.
+            let (claims, decompose_cost) = match self.decompose_claims(&triple.answer).await {
+                Ok(v) => v,
+                Err(e) => {
+                    yield RagEvent::Error(e);
+                    return;
+                }
+            };
+
+            let located: Vec<(String, Option<(usize, usize)>)> = claims
+                .iter()
+                .map(|(text, quote)| {
+                    (text.clone(), deterministic::find_span(&triple.answer, quote))
+                })
+                .collect();
+
+            yield RagEvent::Claims(
+                located
+                    .iter()
+                    .map(|(text, span)| PendingClaim {
+                        start: span.map(|(s, _)| s).unwrap_or(0),
+                        end: span.map(|(_, e)| e).unwrap_or(0),
+                        text: text.clone(),
+                    })
+                    .collect(),
+            );
+
+            // Wave 2: grounding + the three relevancy/context checks, all concurrent.
+            let (verify_res, ar, cp, cr) = futures::future::join4(
+                self.verify_claims(&claims, &triple.contexts),
+                self.scored_check("answer_relevancy", AR_SYS, &Self::ar_user(triple)),
+                self.scored_check("context_precision", CP_SYS, &Self::ctx_user(triple)),
+                self.scored_check("context_recall", CR_SYS, &Self::ctx_user(triple)),
+            )
+            .await;
+
+            let (statuses, verify_cost) = match verify_res {
+                Ok(v) => v,
+                Err(e) => {
+                    yield RagEvent::Error(e);
+                    return;
+                }
+            };
+
+            let (faithfulness, spans, any_contradiction) =
+                Self::compose_faithfulness(&located, &statuses, &claims);
+
+            let (ar_m, ar_c) = ar;
+            let (cp_m, cp_c) = cp;
+            let (cr_m, cr_c) = cr;
+            let metrics = vec![faithfulness, ar_m, cp_m, cr_m];
+            for m in &metrics {
+                yield RagEvent::Metric(m.clone());
+            }
+
+            yield RagEvent::Done {
+                metrics,
+                spans,
+                any_contradiction,
+                cost: decompose_cost + verify_cost + ar_c + cp_c + cr_c,
+            };
+        }
+    }
+
     /// Full RAG scoring: faithfulness (decompose → batched verify → ratio in Rust,
     /// with unsupported spans), plus answer_relevancy, context_precision, and
     /// context_recall. Returns `(metrics, spans, any_contradiction, cost)`, where
@@ -665,15 +838,38 @@ impl ModelClient {
 
         // Step 2: verify all claims (batched) concurrently with the three
         // relevancy/context checks — they're independent.
-        let ar_sys = "Rate how directly the ANSWER addresses the QUESTION. Respond ONLY as JSON \
-            {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. 100 = fully answers, 0 = off-topic.";
-        let cp_sys = "Given the QUESTION, the retrieved CONTEXTS, and the ANSWER, rate the signal-to-noise \
-            of the contexts: what fraction are actually relevant/necessary to answer the question. \
-            Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
-            100 = all contexts relevant, 0 = all noise.";
-        let cr_sys = "Given the QUESTION, the CONTEXTS, and the ANSWER, rate context recall: do the contexts \
-            contain all the information needed to support the answer? Respond ONLY as JSON \
-            {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. 100 = fully covered, 0 = key info missing.";
+        let (verify_res, ar, cp, cr) = futures::future::join4(
+            self.verify_claims(&claims, &triple.contexts),
+            self.scored_check("answer_relevancy", AR_SYS, &Self::ar_user(triple)),
+            self.scored_check("context_precision", CP_SYS, &Self::ctx_user(triple)),
+            self.scored_check("context_recall", CR_SYS, &Self::ctx_user(triple)),
+        )
+        .await;
+
+        let (statuses, verify_cost) = verify_res?;
+        let located: Vec<(String, Option<(usize, usize)>)> = claims
+            .iter()
+            .map(|(text, quote)| (text.clone(), deterministic::find_span(&triple.answer, quote)))
+            .collect();
+        let (faithfulness, spans, any_contradiction) =
+            Self::compose_faithfulness(&located, &statuses, &claims);
+
+        let (ar_m, ar_c) = ar;
+        let (cp_m, cp_c) = cp;
+        let (cr_m, cr_c) = cr;
+        Ok((
+            vec![faithfulness, ar_m, cp_m, cr_m],
+            spans,
+            any_contradiction,
+            decompose_cost + verify_cost + ar_c + cp_c + cr_c,
+        ))
+    }
+
+    fn ar_user(triple: &RagTriple) -> String {
+        format!("QUESTION: {}\nANSWER: {}", triple.question, triple.answer)
+    }
+
+    fn ctx_user(triple: &RagTriple) -> String {
         let ctx_joined = triple
             .contexts
             .iter()
@@ -681,22 +877,19 @@ impl ModelClient {
             .map(|(i, c)| format!("[Context {}]: {c}", i + 1))
             .collect::<Vec<_>>()
             .join("\n");
-        let ar_user = format!("QUESTION: {}\nANSWER: {}", triple.question, triple.answer);
-        let cp_user = format!(
+        format!(
             "QUESTION: {}\n\nCONTEXTS:\n{ctx_joined}\n\nANSWER: {}",
             triple.question, triple.answer
-        );
-        let cr_user = cp_user.clone();
-
-        let (verify_res, ar, cp, cr) = futures::future::join4(
-            self.verify_claims(&claims, &triple.contexts),
-            self.scored_check("answer_relevancy", ar_sys, &ar_user),
-            self.scored_check("context_precision", cp_sys, &cp_user),
-            self.scored_check("context_recall", cr_sys, &cr_user),
         )
-        .await;
+    }
 
-        let (statuses, verify_cost) = verify_res?;
+    /// Turn per-claim verdicts into the faithfulness metric + highlightable spans.
+    /// Shared by the batch and streaming paths so they can never drift apart.
+    fn compose_faithfulness(
+        located: &[(String, Option<(usize, usize)>)],
+        statuses: &[ClaimStatus],
+        claims: &[(String, String)],
+    ) -> (MetricResult, Vec<ClaimSpan>, bool) {
         let supported_count = statuses
             .iter()
             .filter(|s| **s == ClaimStatus::Supported)
@@ -710,17 +903,17 @@ impl ModelClient {
 
         // Map each claim to a char-span via its verbatim quote, so the UI can
         // highlight ungrounded text (contradicted = red, unsupported = amber).
-        let mut spans = Vec::with_capacity(claims.len());
-        for ((claim_text, quote), status) in claims.iter().zip(statuses.iter()) {
-            let span = deterministic::find_span(&triple.answer, quote);
-            spans.push(ClaimSpan {
+        let spans = located
+            .iter()
+            .zip(statuses.iter())
+            .map(|((text, span), status)| ClaimSpan {
                 start: span.map(|(s, _)| s).unwrap_or(0),
                 end: span.map(|(_, e)| e).unwrap_or(0),
-                text: claim_text.clone(),
+                text: text.clone(),
                 supported: *status == ClaimStatus::Supported,
                 contradicted: *status == ClaimStatus::Contradicted,
-            });
-        }
+            })
+            .collect();
 
         // A ratio dilutes severity: 3 harmless-correct claims outvote 1 catastrophically
         // wrong one. Name the contradiction explicitly so the headline can't read "fine".
@@ -730,20 +923,15 @@ impl ModelClient {
                 claims.len()
             )
         } else {
-            format!("{supported_count}/{} claims grounded in the contexts", claims.len())
+            format!(
+                "{supported_count}/{} claims grounded in the contexts",
+                claims.len()
+            )
         };
-        let faithfulness = MetricResult::model("faithfulness", faith_score, 0.9, faith_reason);
-
-        let (ar_m, ar_c) = ar;
-        let (cp_m, cp_c) = cp;
-        let (cr_m, cr_c) = cr;
-        let total_cost = decompose_cost + verify_cost + ar_c + cp_c + cr_c;
-
-        Ok((
-            vec![faithfulness, ar_m, cp_m, cr_m],
+        (
+            MetricResult::model("faithfulness", faith_score, 0.9, faith_reason),
             spans,
             any_contradiction,
-            total_cost,
-        ))
+        )
     }
 }
