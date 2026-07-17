@@ -42,6 +42,29 @@ const MAX_RETRIES: u32 = 4;
 /// Ceiling on any single backoff sleep.
 const MAX_BACKOFF_MS: u64 = 12_000;
 
+// Output budgets, sized to what each check actually returns.
+//
+// These are NOT a micro-optimisation. Providers reserve `max_tokens` against your quota
+// at request time, spent or not — Groq's own 429 shows it: prompt 116 + max_tokens 2048
+// = "Requested 2164" against a 100k tokens/day free tier. A blanket 2048 was therefore
+// billing ~2.1k tokens to receive a ~50-token JSON object, burning ~93% of the daily
+// budget on nothing and capping us at ~46 calls/day. Sized properly it's ~270.
+//
+// Set them generously enough that a truncated response (which fails to parse and costs a
+// retry) stays impossible.
+/// `{score, confidence, reason}` — one short sentence.
+const MAX_TOKENS_SCORE: u32 = 256;
+/// A claims array with a verbatim quote per claim.
+const MAX_TOKENS_DECOMPOSE: u32 = 1536;
+/// One verdict object per claim.
+const MAX_TOKENS_VERIFY: u32 = 1024;
+
+/// How long a throttled provider is skipped before we try it again.
+///
+/// Long enough to matter (a per-minute limit clears, a daily quota obviously doesn't),
+/// short enough that a brief spike doesn't sideline a healthy provider for long.
+const PROVIDER_COOLDOWN_SECS: u64 = 45;
+
 /// How many steps of a trace get **model** checks in a single request.
 ///
 /// Security bound, not a performance knob. The model layer fires 2 calls per step with
@@ -106,6 +129,14 @@ pub struct ModelClient {
     /// See [`DEFAULT_MAX_MODEL_STEPS`]. Bounds model calls per request so an
     /// oversized trace can't drain the quota.
     max_model_steps: usize,
+    /// Circuit breaker: providers currently known to be throttled, keyed by base URL.
+    /// Entries expire on their own (moka TTL), which *is* the breaker closing again.
+    ///
+    /// Without this, a provider that is out of quota **for the day** still gets tried
+    /// first on every request, burning the full retry ladder before failing over —
+    /// measured at 42s per request once Gemini's 500/day free quota ran out. Retrying a
+    /// daily quota is pointless; skip it and go straight to the provider that works.
+    cooling: moka::future::Cache<String, ()>,
 }
 
 // --- Chat wire types -------------------------------------------------------
@@ -315,6 +346,10 @@ impl ModelClient {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_MAX_MODEL_STEPS),
+            cooling: moka::future::Cache::builder()
+                .max_capacity(8)
+                .time_to_live(Duration::from_secs(PROVIDER_COOLDOWN_SECS))
+                .build(),
         })
     }
 
@@ -342,6 +377,7 @@ impl ModelClient {
         check: &str,
         system: &str,
         user: &str,
+        max_tokens: u32,
     ) -> Result<ChatOut, CallErr> {
         let url = format!("{}/chat/completions", provider.base_url.trim_end_matches('/'));
         let body = json!({
@@ -351,7 +387,9 @@ impl ModelClient {
                 { "role": "user",   "content": user   }
             ],
             "temperature": 0.0,
-            "max_tokens": 2048,
+            // Reserved against the provider's quota whether we use it or not — see the
+            // MAX_TOKENS_* consts. Do not replace with a blanket value.
+            "max_tokens": max_tokens,
             "stream": false,
             // OpenAI structured-output: force a JSON object body. We still parse
             // tolerantly (see `parse`) so providers that ignore this still work.
@@ -428,6 +466,7 @@ impl ModelClient {
         check: &str,
         system: &str,
         user: &str,
+        max_tokens: u32,
     ) -> Result<ChatOut, String> {
         let cache_input = format!("{system}\n---\n{user}");
         if let Some(cached) = self.cache.get(check, &primary.model, &cache_input).await {
@@ -439,12 +478,25 @@ impl ModelClient {
         for attempt in 0..=MAX_RETRIES {
             let mut throttle_hint: Option<u64> = None;
 
-            for (idx, provider) in [primary, secondary].into_iter().enumerate() {
+            // Prefer a provider that isn't in cooldown. If both are cooling we still try
+            // them (rather than fail instantly) — the breaker is there to reorder work
+            // away from a dead provider, not to refuse to do it.
+            let both = [primary, secondary];
+            let mut order: Vec<&Provider> = both
+                .iter()
+                .copied()
+                .filter(|p| !self.is_cooling(p))
+                .collect();
+            if order.is_empty() {
+                order = both.to_vec();
+            }
+
+            for (idx, provider) in order.into_iter().enumerate() {
                 // Skip the duplicate call when both roles point at one provider.
                 if idx == 1 && secondary.model == primary.model && secondary.base_url == primary.base_url {
                     continue;
                 }
-                match self.chat_once(provider, check, system, user).await {
+                match self.chat_once(provider, check, system, user, max_tokens).await {
                     Ok(out) => {
                         if idx == 1 {
                             tracing::info!(check, from = %primary.model, to = %provider.model,
@@ -458,6 +510,7 @@ impl ModelClient {
                     Err(CallErr::Throttled { retry_ms }) => {
                         throttled = true;
                         throttle_hint = throttle_hint.or(retry_ms);
+                        self.mark_cooling(provider).await;
                         continue; // try the other provider before sleeping
                     }
                     Err(CallErr::Other(e)) => {
@@ -485,6 +538,20 @@ impl ModelClient {
             }
             (None, false) => format!("all providers unavailable after {MAX_RETRIES} retries"),
         })
+    }
+
+    /// Is this provider currently sidelined for throttling?
+    fn is_cooling(&self, p: &Provider) -> bool {
+        self.cooling.contains_key(&p.base_url)
+    }
+
+    /// Sideline a provider that just throttled, so the next request tries the other one
+    /// first instead of re-paying the retry ladder against a quota that hasn't reset.
+    async fn mark_cooling(&self, p: &Provider) {
+        if !self.is_cooling(p) {
+            tracing::warn!(model = %p.model, secs = PROVIDER_COOLDOWN_SECS, "provider cooling down");
+        }
+        self.cooling.insert(p.base_url.clone(), ()).await;
     }
 
     /// Milliseconds to wait per the `Retry-After` header (sent in seconds).
@@ -563,7 +630,7 @@ impl ModelClient {
         system: &str,
         user: &str,
     ) -> (MetricResult, f64) {
-        let (fast_out, mut cost) = match self.chat(&self.fast, &self.strong, check, system, user).await {
+        let (fast_out, mut cost) = match self.chat(&self.fast, &self.strong, check, system, user, MAX_TOKENS_SCORE).await {
             Ok(o) => (Self::parse::<ScoreOut>(&o.text), o.cost_usd),
             Err(e) => {
                 return (
@@ -587,7 +654,7 @@ impl ModelClient {
 
         // Escalate low-confidence fast results to the strong model.
         if (fast.confidence as f32) < self.escalate_below {
-            if let Ok(o) = self.chat(&self.strong, &self.fast, check, system, user).await {
+            if let Ok(o) = self.chat(&self.strong, &self.fast, check, system, user, MAX_TOKENS_SCORE).await {
                 cost += o.cost_usd;
                 if let Some(strong) = Self::parse::<ScoreOut>(&o.text) {
                     let mut m = MetricResult::model(
@@ -727,7 +794,14 @@ impl ModelClient {
             the answer it is drawn from (copied character-for-character, no paraphrasing). \
             Respond ONLY as JSON {\"claims\":[{\"id\":1,\"text\":\"...\",\"quote\":\"...\"}]}.";
         let out = self
-            .chat(&self.fast, &self.strong, "rag_decompose", system, &format!("ANSWER:\n{answer}"))
+            .chat(
+                &self.fast,
+                &self.strong,
+                "rag_decompose",
+                system,
+                &format!("ANSWER:\n{answer}"),
+                MAX_TOKENS_DECOMPOSE,
+            )
             .await?;
         let parsed: ClaimsOut = Self::parse(&out.text)
             .ok_or_else(|| format!("unparseable decomposition: {}", out.text))?;
@@ -773,7 +847,9 @@ impl ModelClient {
             .join("\n");
         let user = format!("CONTEXTS:\n{ctx}\n\nCLAIMS:\n{claim_list}");
 
-        let out = self.chat(&self.fast, &self.strong, "rag_verify", system, &user).await?;
+        let out = self
+            .chat(&self.fast, &self.strong, "rag_verify", system, &user, MAX_TOKENS_VERIFY)
+            .await?;
         let parsed: VerifyOut = Self::parse(&out.text)
             .ok_or_else(|| format!("unparseable verification: {}", out.text))?;
 
