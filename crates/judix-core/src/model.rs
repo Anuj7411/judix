@@ -238,18 +238,17 @@ enum CallErr {
 
 #[derive(Deserialize)]
 struct ScoreOut {
-    #[serde(default = "half")]
+    // `score` and `confidence` are REQUIRED (no serde default): a response that omits
+    // either is a broken judgement, and defaulting it to 50/0.7 would (a) silently pass a
+    // fabricated result into the composite and (b) sit above the 0.6 escalation threshold
+    // so it never gets re-asked. Making them required means such a response fails to
+    // deserialize and `chat_json` fails over to the next provider instead.
     score: f64,
-    #[serde(default = "point_seven")]
     confidence: f64,
+    // `reason` stays optional — it's cosmetic, and a missing reason shouldn't discard an
+    // otherwise-valid score.
     #[serde(default)]
     reason: String,
-}
-fn half() -> f64 {
-    50.0
-}
-fn point_seven() -> f64 {
-    0.7
 }
 
 /// Both per-step judgements from a single call.
@@ -265,7 +264,12 @@ struct StepPairOut {
 
 #[derive(Deserialize)]
 struct ClaimsOut {
-    #[serde(default)]
+    // REQUIRED (no default). A `{}` with no `claims` key is a failed decomposition, not
+    // "an answer with zero claims" — and defaulting it to an empty vec is dangerous:
+    // faithfulness_ratio(0, 0) returns 100 ("vacuously faithful"), so a garbled decompose
+    // on a hallucinating answer would report faithfulness 100 — the exact opposite of the
+    // money demo's job. Required key → a keyless `{}` fails to parse → fail over. A genuine
+    // `{"claims":[]}` (key present, empty) still parses and is a legitimate "no claims".
     claims: Vec<ClaimItem>,
 }
 #[derive(Deserialize)]
@@ -347,19 +351,32 @@ impl ModelClient {
         let api_key = std::env::var("JUDIX_API_KEY").ok().filter(|k| !k.is_empty())?;
         let model_fast =
             std::env::var("JUDIX_MODEL_FAST").unwrap_or_else(|_| "gemini-flash-latest".into());
-        let model_strong = std::env::var("JUDIX_MODEL_STRONG")
-            .unwrap_or_else(|_| "llama-3.3-70b-versatile".into());
 
         let fast = Provider {
             base_url: base_url.clone(),
             api_key: api_key.clone(),
-            model: model_fast,
+            model: model_fast.clone(),
         };
-        // Strong provider falls back to the fast provider's URL/key when its own
-        // env vars are absent (so a single-provider setup still works).
+
+        // Strong provider falls back to the fast provider's URL/key when its own env vars
+        // are absent (so a single-provider setup still works). Crucially, when there is NO
+        // separate strong endpoint, the strong *model* mirrors the fast model rather than
+        // defaulting to a Groq name — otherwise a one-key (e.g. Gemini-only) deployment
+        // would send "llama-3.3-70b-versatile" to Gemini's endpoint, a permanent 4xx that
+        // never cools (it's not a 429) and gets retried on every escalation forever.
+        let strong_url = std::env::var("JUDIX_STRONG_BASE_URL");
+        let strong_key = std::env::var("JUDIX_STRONG_API_KEY");
+        let has_separate_strong = strong_url.is_ok() || strong_key.is_ok();
+        let model_strong = std::env::var("JUDIX_MODEL_STRONG").unwrap_or_else(|_| {
+            if has_separate_strong {
+                "llama-3.3-70b-versatile".into()
+            } else {
+                model_fast.clone()
+            }
+        });
         let strong = Provider {
-            base_url: std::env::var("JUDIX_STRONG_BASE_URL").unwrap_or(base_url),
-            api_key: std::env::var("JUDIX_STRONG_API_KEY").unwrap_or(api_key),
+            base_url: strong_url.unwrap_or(base_url),
+            api_key: strong_key.unwrap_or(api_key),
             model: model_strong,
         };
 
@@ -414,7 +431,16 @@ impl ModelClient {
         );
 
         Some(Self {
-            http: Client::new(),
+            // Timeouts are load-bearing, not hygiene. Each in-flight call holds a
+            // concurrency permit for its whole duration, and free/3rd-party endpoints do
+            // sometimes accept a connection and then never respond. Without a timeout, a
+            // handful of stalled calls would pin every permit and wedge the model layer
+            // for everyone, indefinitely. 30s is well above a normal ~2-15s completion.
+            http: Client::builder()
+                .timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(8))
+                .build()
+                .unwrap_or_else(|_| Client::new()),
             fast,
             strong,
             pool,
@@ -445,7 +471,7 @@ impl ModelClient {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(DEFAULT_MAX_MODEL_STEPS),
             cooling: moka::future::Cache::builder()
-                .max_capacity(8)
+                .max_capacity(64)
                 .time_to_live(Duration::from_secs(PROVIDER_COOLDOWN_SECS))
                 .build(),
         })
@@ -674,25 +700,41 @@ impl ModelClient {
             }
         }
 
+        // The deduped candidate set, primary/secondary first, then the rest of the pool.
+        let mut all: Vec<&Provider> = Vec::with_capacity(self.pool.len() + 2);
+        for p in std::iter::once(primary)
+            .chain(std::iter::once(secondary))
+            .chain(self.pool.iter())
+        {
+            if !all.iter().any(|q| q.same_as(p)) {
+                all.push(p);
+            }
+        }
+
         let mut last_err: Option<String> = None;
         let mut throttled = false;
         for attempt in 0..=MAX_RETRIES {
             let mut throttle_hint: Option<u64> = None;
 
-            // Try `primary` first, then `secondary`, then every other pooled provider —
-            // deduped, and preferring ones that aren't in cooldown. If everything is
-            // cooling we still try (rather than fail instantly): the breaker exists to
-            // reorder work away from a dead provider, not to add a new way to fail.
-            let mut order: Vec<&Provider> = Vec::with_capacity(self.pool.len() + 2);
-            for p in std::iter::once(primary)
-                .chain(std::iter::once(secondary))
-                .chain(self.pool.iter())
-            {
-                if !order.iter().any(|q| q.same_as(p)) {
-                    order.push(p);
+            // Actually EXCLUDE providers in cooldown, not just reorder them — retrying a
+            // model that just told us it's out of quota is pure latency. Fall back to the
+            // whole set only when everything is cooling (so we never refuse to try).
+            let order: Vec<&Provider> = {
+                let healthy: Vec<&Provider> =
+                    all.iter().copied().filter(|p| !self.is_cooling(p)).collect();
+                if healthy.is_empty() {
+                    all.clone()
+                } else {
+                    healthy
                 }
-            }
-            order.sort_by_key(|p| self.is_cooling(p)); // stable: healthy first
+            };
+
+            // Track whether the whole pass was pure throttling: if every provider we tried
+            // came back 429, a sub-second backoff won't un-exhaust them (quotas reset on
+            // the minute/day, not in 2s), so re-walking the pool MAX_RETRIES times is the
+            // exact multi-second storm the breaker exists to prevent. A non-throttle error
+            // (transient network/5xx) is worth a retry, so it clears the flag.
+            let mut pure_throttle_pass = true;
 
             for provider in order {
                 match self.chat_once(provider, check, system, user, max_tokens).await {
@@ -703,6 +745,7 @@ impl ModelClient {
                             tracing::warn!(check, model = %provider.model,
                                 "unparseable output — trying next provider");
                             last_err = Some(format!("unparseable output from {}", provider.model));
+                            pure_throttle_pass = false;
                             continue;
                         }
                         if !provider.same_as(primary) {
@@ -720,20 +763,23 @@ impl ModelClient {
                         throttled = true;
                         throttle_hint = throttle_hint.or(retry_ms);
                         self.mark_cooling(provider).await;
-                        continue; // try the other provider before sleeping
+                        continue; // try the next provider before sleeping
                     }
                     Err(CallErr::Other(e)) => {
                         last_err = Some(e);
+                        pure_throttle_pass = false;
                         continue;
                     }
                 }
             }
 
-            // Both providers unavailable — now a wait is actually warranted. Honor
-            // the provider's own hint when it gave one, else exponential backoff.
+            // Whole pass throttled → stop; backoff can't help a rate/quota limit in time.
+            if pure_throttle_pass {
+                break;
+            }
             if attempt < MAX_RETRIES {
                 let delay = throttle_hint.unwrap_or_else(|| Self::backoff_ms(attempt));
-                tracing::warn!(check, attempt, delay_ms = delay, "all providers busy — backing off");
+                tracing::warn!(check, attempt, delay_ms = delay, "providers unavailable — backing off");
                 tokio::time::sleep(Duration::from_millis(delay)).await;
             }
         }
@@ -749,18 +795,25 @@ impl ModelClient {
         })
     }
 
-    /// Is this provider currently sidelined for throttling?
-    fn is_cooling(&self, p: &Provider) -> bool {
-        self.cooling.contains_key(&p.base_url)
+    /// Cooldown key: `base_url` + `model`. Free quotas meter per model (that's the whole
+    /// point of auto-expanding a key into its siblings), so a throttled `gemini-flash-latest`
+    /// must NOT sideline `gemini-2.5-flash` on the same endpoint — they have separate quotas.
+    fn cooling_key(p: &Provider) -> String {
+        format!("{}|{}", p.base_url, p.model)
     }
 
-    /// Sideline a provider that just throttled, so the next request tries the other one
-    /// first instead of re-paying the retry ladder against a quota that hasn't reset.
+    /// Is this provider currently sidelined for throttling?
+    fn is_cooling(&self, p: &Provider) -> bool {
+        self.cooling.contains_key(&Self::cooling_key(p))
+    }
+
+    /// Sideline a provider that just throttled, so the next request skips it instead of
+    /// re-paying against a quota that hasn't reset.
     async fn mark_cooling(&self, p: &Provider) {
         if !self.is_cooling(p) {
             tracing::warn!(model = %p.model, secs = PROVIDER_COOLDOWN_SECS, "provider cooling down");
         }
-        self.cooling.insert(p.base_url.clone(), ()).await;
+        self.cooling.insert(Self::cooling_key(p), ()).await;
     }
 
     /// Milliseconds to wait per the `Retry-After` header (sent in seconds).
@@ -1077,8 +1130,11 @@ impl ModelClient {
             verifiable statement. For each claim also return `quote`: the EXACT verbatim substring of \
             the answer it is drawn from (copied character-for-character, no paraphrasing). \
             Respond ONLY as JSON {\"claims\":[{\"id\":1,\"text\":\"...\",\"quote\":\"...\"}]}.";
-        let out = self
-            .chat(
+        // chat_json, so a provider that returns a garbled/empty decomposition is treated
+        // as a failed provider and the next one is tried — instead of erroring the whole
+        // RAG request or (worse) yielding an empty claim set that scores faithfulness 100.
+        let (parsed, cost): (ClaimsOut, f64) = self
+            .chat_json(
                 &self.fast,
                 &self.strong,
                 "rag_decompose",
@@ -1087,8 +1143,6 @@ impl ModelClient {
                 MAX_TOKENS_DECOMPOSE,
             )
             .await?;
-        let parsed: ClaimsOut = Self::parse(&out.text)
-            .ok_or_else(|| format!("unparseable decomposition: {}", out.text))?;
         let claims = parsed
             .claims
             .into_iter()
@@ -1101,7 +1155,7 @@ impl ModelClient {
                 (c.text, quote)
             })
             .collect();
-        Ok((claims, out.cost_usd))
+        Ok((claims, cost))
     }
 
     /// (b) Verify ALL claims against the contexts in one batched call.
@@ -1333,5 +1387,39 @@ impl ModelClient {
             spans,
             any_contradiction,
         )
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    // BLOCKER-fix regression: a judgement object missing `score`/`confidence` must FAIL to
+    // parse (so chat_json fails over) rather than defaulting to 50/0.7 and flowing a
+    // fabricated result into the composite.
+    #[test]
+    fn score_out_requires_score_and_confidence() {
+        assert!(ModelClient::parse::<ScoreOut>(r#"{"score":80,"confidence":0.9}"#).is_some());
+        assert!(ModelClient::parse::<ScoreOut>(r#"{"score":80}"#).is_none(), "missing confidence must fail");
+        assert!(ModelClient::parse::<ScoreOut>(r#"{}"#).is_none(), "empty judgement must fail");
+    }
+
+    #[test]
+    fn step_pair_requires_both_judgements() {
+        let ok = r#"{"step_relevance":{"score":10,"confidence":0.9,"reason":"x"},"goal_drift":{"score":20,"confidence":0.8,"reason":"y"}}"#;
+        assert!(ModelClient::parse::<StepPairOut>(ok).is_some());
+        // one judgement present, the other an empty object -> must fail, forcing failover.
+        let half = r#"{"step_relevance":{"score":80,"confidence":0.9,"reason":"x"},"goal_drift":{}}"#;
+        assert!(ModelClient::parse::<StepPairOut>(half).is_none(), "half a step must fail");
+    }
+
+    // BLOCKER-fix regression: an empty/garbled decompose must NOT parse to zero claims
+    // (which would score faithfulness 100 on a hallucination). A key-absent object fails;
+    // a genuine empty array is still allowed.
+    #[test]
+    fn claims_out_key_required_but_empty_array_allowed() {
+        assert!(ModelClient::parse::<ClaimsOut>(r#"{}"#).is_none(), "missing claims key must fail");
+        assert!(ModelClient::parse::<ClaimsOut>(r#"{"claims":[]}"#).is_some(), "empty array is legit");
+        assert!(ModelClient::parse::<ClaimsOut>(r#"{"claims":[{"text":"a","quote":"a"}]}"#).is_some());
     }
 }

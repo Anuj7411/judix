@@ -99,7 +99,7 @@ To enable the model layer, set the env vars below and restart. `GET /health` rep
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `GET` | `/` | — | the web playground |
-| `GET` | `/health` | — | `{ok, service, version, model_layer, model_fast}` |
+| `GET` | `/health` | — | `{ok, service, version, model_layer, model_fast, model_pool, commit}` |
 | `GET` | `/api` | — | machine-readable endpoint list |
 | `POST` | `/score/agent` | `AgentTrace` | `AgentReport` — `{run_quality, band, steps[], latency_ms, model_cost_usd, deterministic_share}` |
 | `POST` | `/score/rag` | `RagTriple` | `RagReport` — `{rag_quality, band, metrics[], unsupported_spans[], latency_ms, model_cost_usd}` |
@@ -153,8 +153,10 @@ The model layer is any **OpenAI-compatible** chat API. Two independent providers
 | `JUDIX_STRONG_BASE_URL` | falls back to `JUDIX_BASE_URL` | strong provider base URL, e.g. `https://api.groq.com/openai/v1` |
 | `JUDIX_STRONG_API_KEY` | falls back to `JUDIX_API_KEY` | strong provider key ([console.groq.com](https://console.groq.com), free, no card) |
 | `JUDIX_MODEL_STRONG` | `llama-3.3-70b-versatile` | escalation model |
+| `JUDIX_AUTO_EXPAND` | `1` | auto-expand each key into all its provider's free models (`0` disables) |
 | `JUDIX_EXTRA_PROVIDERS` | *(none)* | JSON array of extra failover endpoints — see the pool section |
 | `JUDIX_ESCALATE_BELOW` | `0.6` | re-run a check on the strong model below this confidence |
+| `JUDIX_RATE_LIMIT_PER_MIN` | `20` | per-IP cap on `/score/*` requests before `429` |
 | `JUDIX_MAX_MODEL_STEPS` | `40` | max steps per request that get **model** checks (see Security) |
 | `JUDIX_CACHE_TTL_SECS` | `21600` | response-cache TTL |
 | `PORT` | `8000` | listen port (hosts inject this) |
@@ -258,8 +260,13 @@ that path is free and linear (10k steps score in ~0.1s, pinned by a test).
 
 **Oversized bodies** are rejected by axum's 2MB default (`HTTP 413`, verified).
 
-Not implemented: rate limiting per IP. A determined attacker can still spend the quota
-40 calls at a time. For a public production deploy, put a rate limiter in front.
+**Rate limiting — per IP.** The scoring routes are capped at `JUDIX_RATE_LIMIT_PER_MIN`
+(default 20) requests per client per minute, returning `429` + `Retry-After`. `/health`
+and `/demo/*` are exempt (the keep-warm pinger and the playground must never be throttled).
+The client IP is taken from **`CF-Connecting-IP`** (written by Cloudflare, in front of
+Render) in preference to `X-Forwarded-For`, whose first hop is client-supplied — verified
+that an already-blocked IP forging a different `X-Forwarded-For` per request still gets
+`429`, so the limiter can't be spoofed away.
 
 ## Testing
 

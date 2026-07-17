@@ -316,7 +316,7 @@ with `latency_ms: 0` and `model_cost_usd: 0.0`. See hazard 9.1.
 | Method | Path | Body | Returns | Rate limited |
 | --- | --- | --- | --- | --- |
 | `GET` | `/` | | the playground HTML | no |
-| `GET` | `/health` | | `{ok, service, version, model_layer, model_fast, commit}` | no |
+| `GET` | `/health` | | `{ok, service, version, model_layer, model_fast, model_pool, commit}` | no |
 | `GET` | `/api` | | machine-readable endpoint list | no |
 | `GET` | `/demo/{id}` | | fixture JSON, or 404 `{error, valid:[...]}` | no |
 | `POST` | `/score/agent` | `AgentTrace` | `AgentReport` | yes |

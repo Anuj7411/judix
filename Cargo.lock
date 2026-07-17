@@ -867,10 +867,12 @@ dependencies = [
  "async-stream",
  "axum",
  "futures",
+ "http-body-util",
  "judix-core",
  "moka",
  "serde_json",
  "tokio",
+ "tower",
  "tracing",
  "tracing-subscriber",
 ]

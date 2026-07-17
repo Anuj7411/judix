@@ -450,3 +450,174 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{HeaderMap, HeaderValue, Request, StatusCode};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt; // for `oneshot`
+
+    // Serializes tests that mutate process-global env, so a rate-limit test's
+    // JUDIX_RATE_LIMIT_PER_MIN can't bleed into a concurrent test's build_app().
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Build the router under a given env, keyless. The lock is held ONLY across the
+    /// synchronous env-read + `build_app()` (all env is consumed there), and dropped
+    /// before the caller awaits — so no MutexGuard ever crosses an `.await`.
+    fn app_with(env: &[(&str, &str)]) -> Router {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::remove_var("JUDIX_API_KEY");
+        for (k, v) in env {
+            std::env::set_var(k, v);
+        }
+        let app = build_app();
+        for (k, _) in env {
+            std::env::remove_var(k);
+        }
+        app
+    }
+
+    fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+        use axum::http::HeaderName;
+        let mut h = HeaderMap::new();
+        for (k, v) in pairs {
+            h.insert(
+                HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                HeaderValue::from_str(v).unwrap(),
+            );
+        }
+        h
+    }
+
+    // --- client_ip: the anti-spoofing invariant the whole rate limiter rests on ---
+
+    #[test]
+    fn client_ip_prefers_cf_over_xff() {
+        // CF-Connecting-IP is written by Cloudflare; XFF's first hop is client-supplied.
+        // Trusting XFF first would let an attacker forge a fresh identity per request.
+        let h = headers(&[("cf-connecting-ip", "1.1.1.1"), ("x-forwarded-for", "9.9.9.9")]);
+        assert_eq!(client_ip(&h), "1.1.1.1");
+    }
+
+    #[test]
+    fn client_ip_xff_takes_first_hop() {
+        let h = headers(&[("x-forwarded-for", "2.2.2.2, 3.3.3.3")]);
+        assert_eq!(client_ip(&h), "2.2.2.2");
+    }
+
+    #[test]
+    fn client_ip_falls_back_to_direct() {
+        assert_eq!(client_ip(&HeaderMap::new()), "direct");
+    }
+
+    // --- HTTP surface (keyless: model layer is None, deterministic path) ---
+
+    async fn body_json(resp: axum::response::Response) -> serde_json::Value {
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn health_exposes_all_documented_fields() {
+        let resp = app_with(&[])
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let v = body_json(resp).await;
+        for field in ["ok", "service", "version", "model_layer", "model_fast", "model_pool", "commit"] {
+            assert!(v.get(field).is_some(), "/health missing `{field}`: {v}");
+        }
+    }
+
+    #[tokio::test]
+    async fn score_agent_works_with_no_key() {
+        // The money demo must score fully on the deterministic engine alone.
+        let resp = app_with(&[])
+            .oneshot(
+                Request::post("/score/agent")
+                    .header("content-type", "application/json")
+                    .body(Body::from(DEMO_WRONG_TOOL))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let v = body_json(resp).await;
+        assert_eq!(v["deterministic_share"], 1.0, "keyless must be 100% deterministic");
+        assert!(v["run_quality"].as_f64().unwrap() < 60.0, "wrong_tool must be capped red/amber");
+    }
+
+    #[tokio::test]
+    async fn rag_without_model_returns_501() {
+        let resp = app_with(&[])
+            .oneshot(
+                Request::post("/score/rag")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"question":"q","contexts":["c"],"answer":"a"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(body_json(resp).await["status"], "model_required");
+    }
+
+    // --- rate limiter ---
+
+    async fn post_agent(app: &Router, ip: &str) -> StatusCode {
+        app.clone()
+            .oneshot(
+                Request::post("/score/agent")
+                    .header("content-type", "application/json")
+                    .header("cf-connecting-ip", ip)
+                    .body(Body::from(r#"{"goal":"x","steps":[]}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+    }
+
+    #[tokio::test]
+    async fn rate_limit_returns_429_after_cap() {
+        let app = app_with(&[("JUDIX_RATE_LIMIT_PER_MIN", "2")]);
+        assert_eq!(post_agent(&app, "7.7.7.7").await, StatusCode::OK);
+        assert_eq!(post_agent(&app, "7.7.7.7").await, StatusCode::OK);
+        assert_eq!(post_agent(&app, "7.7.7.7").await, StatusCode::TOO_MANY_REQUESTS);
+        // A DIFFERENT IP has its own bucket and is unaffected.
+        assert_eq!(post_agent(&app, "8.8.8.8").await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn health_and_demo_are_never_rate_limited() {
+        let app = app_with(&[("JUDIX_RATE_LIMIT_PER_MIN", "1")]);
+        // Same IP, well past the cap of 1 — these routes are exempt.
+        for _ in 0..5 {
+            let h = app
+                .clone()
+                .oneshot(
+                    Request::get("/health")
+                        .header("cf-connecting-ip", "6.6.6.6")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(h.status(), StatusCode::OK);
+            let d = app
+                .clone()
+                .oneshot(
+                    Request::get("/demo/clean")
+                        .header("cf-connecting-ip", "6.6.6.6")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(d.status(), StatusCode::OK);
+        }
+    }
+}
