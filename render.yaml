@@ -1,33 +1,40 @@
 services:
   - type: web
     name: judix
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
     plan: free
+    # Deploy a PREBUILT image instead of compiling Rust on Render's builder.
+    #
+    # Why: Render's free-tier builder stopped shipping commits the moment the model
+    # layer pulled in reqwest/tokio/jsonschema — the live service sat ~5 commits stale
+    # while the identical source built clean in ~90s on a standard Linux runner. So the
+    # image is built + smoke-tested by .github/workflows/docker.yml and published to
+    # GHCR (public, anonymously pullable); Render just runs it. Compiling is off the
+    # deploy path entirely, and the artifact is reproducible for anyone: `docker run`.
+    runtime: image
+    image:
+      url: ghcr.io/anuj7411/judix:latest
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       # Model layer (§7/§8). Deterministic scoring works with these unset; set
       # JUDIX_API_KEY (a Gemini key) to light up step_relevance / goal_drift /
-      # RAG faithfulness. Fast = Gemini 3.x Flash (primary judge); strong =
-      # escalation for low-confidence checks (defaults to fast when its own
-      # URL/key are unset). Keys are dashboard secrets (sync:false), never in git.
+      # RAG faithfulness. GET /health reports model_layer: enabled once it's live.
+      # Fast = primary judge; strong = an INDEPENDENT provider (Groq), so a throttled
+      # or low-confidence check gets a real second opinion rather than a sleep.
+      # Keys are dashboard secrets (sync:false) and are never committed.
       - key: JUDIX_BASE_URL
         value: https://generativelanguage.googleapis.com/v1beta/openai
       - key: JUDIX_API_KEY
         sync: false
       - key: JUDIX_MODEL_FAST
         value: gemini-3.1-flash-lite
-      # Strong = an INDEPENDENT provider (Groq) so a low-confidence check gets a
-      # genuine second opinion rather than re-asking the model that was unsure.
       - key: JUDIX_STRONG_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: JUDIX_STRONG_API_KEY
         sync: false
       - key: JUDIX_MODEL_STRONG
         value: llama-3.3-70b-versatile
-      # Escalate to the strong model below this confidence. 0.6, not 0.5: Gemini
-      # floors its uncertainty at exactly 0.5, so the spec's `< 0.5` never fires.
+      # Escalate to the strong model below this confidence. 0.6, not 0.5: Gemini floors
+      # its uncertainty at exactly 0.5, so the spec's `< 0.5` would never fire.
       - key: JUDIX_ESCALATE_BELOW
         value: "0.6"
