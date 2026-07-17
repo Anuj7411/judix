@@ -1,8 +1,9 @@
 use axum::{
-    extract::{Path, State},
-    http::StatusCode,
+    extract::{Path, Request, State},
+    http::{HeaderMap, StatusCode},
+    middleware::{self, Next},
     response::sse::{Event, KeepAlive, Sse},
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
@@ -12,6 +13,7 @@ use judix_core::scoring::{score_agent, score_rag};
 use judix_core::types::{AgentTrace, MetricResult, RagTriple};
 use serde_json::{json, Value};
 use std::convert::Infallible;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,9 +22,76 @@ const DEMO_CLEAN: &str = include_str!("../../../demos/clean.json");
 const DEMO_WRONG_TOOL: &str = include_str!("../../../demos/wrong_tool.json");
 const DEMO_RAG: &str = include_str!("../../../demos/rag_hallucination.json");
 
+/// Scoring requests allowed per client IP per minute, before `429`.
+///
+/// Sized against the real cost, not a round number: with `JUDIX_MAX_MODEL_STEPS` at 40 a
+/// single request can spend 80 model calls, and the free tiers total ~1-2k/day. 20/min is
+/// far more than a human clicking demos will ever need (the playground fires one request
+/// per click) while turning "one curl loop drains the quota" into something an attacker
+/// has to work at from many IPs.
+const DEFAULT_RATE_LIMIT_PER_MIN: u32 = 20;
+
 #[derive(Clone)]
 struct AppState {
     model: Option<Arc<ModelClient>>,
+    /// Fixed-window hit counts per client IP. Entries expire 60s after first insert,
+    /// which *is* the window reset — no sweeper task needed.
+    hits: moka::future::Cache<String, Arc<AtomicU32>>,
+    rate_limit: u32,
+}
+
+/// The client's IP as seen through Render's Cloudflare edge.
+///
+/// Deliberately NOT `ConnectInfo<SocketAddr>`: behind a proxy that returns the *edge's*
+/// address, so every visitor on earth would share one bucket and the first judge to click
+/// twice would rate-limit everyone else.
+///
+/// Header order is a security decision. `CF-Connecting-IP` is written by Cloudflare and
+/// overwrites anything the client sent, so it can be trusted. `X-Forwarded-For`'s first
+/// entry is client-supplied — trusting it first would let an attacker forge a fresh
+/// identity per request and bypass the limiter entirely. It's only a fallback for running
+/// behind a different proxy.
+fn client_ip(headers: &HeaderMap) -> String {
+    for name in ["cf-connecting-ip", "x-forwarded-for"] {
+        if let Some(v) = headers.get(name).and_then(|v| v.to_str().ok()) {
+            let first = v.split(',').next().unwrap_or(v).trim();
+            if !first.is_empty() {
+                return first.to_string();
+            }
+        }
+    }
+    // No proxy headers (e.g. local dev): one shared bucket is fine.
+    "direct".to_string()
+}
+
+/// Fixed-window per-IP rate limit, applied only to the endpoints that spend money.
+async fn rate_limit_mw(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, [(&'static str, &'static str); 1], Json<Value>)> {
+    let ip = client_ip(req.headers());
+    let counter = state
+        .hits
+        .get_with(ip.clone(), async { Arc::new(AtomicU32::new(0)) })
+        .await;
+    let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+
+    if n > state.rate_limit {
+        tracing::warn!(ip = %ip, hits = n, limit = state.rate_limit, "rate limited");
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            [("retry-after", "60")],
+            Json(json!({
+                "error": "rate_limited",
+                "message": format!(
+                    "More than {} scoring requests in a minute. Scoring spends model calls on a free tier, so it's capped per IP. Retry in 60s — /demo/* and /health are not limited.",
+                    state.rate_limit
+                ),
+            })),
+        ));
+    }
+    Ok(next.run(req).await)
 }
 
 pub fn build_app() -> Router {
@@ -32,16 +101,31 @@ pub fn build_app() -> Router {
     } else {
         tracing::info!("model layer disabled — deterministic-only mode");
     }
-    let state = AppState { model };
+    let rate_limit = std::env::var("JUDIX_RATE_LIMIT_PER_MIN")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_RATE_LIMIT_PER_MIN);
+    let state = AppState {
+        model,
+        // TTL == the window: an entry created by the first hit expires 60s later, which
+        // resets the count. Bounded at 10k IPs so the limiter can't itself be a memory
+        // DoS via spoofed/rotating addresses.
+        hits: moka::future::Cache::builder()
+            .max_capacity(10_000)
+            .time_to_live(Duration::from_secs(60))
+            .build(),
+        rate_limit,
+    };
+    tracing::info!(rate_limit, "scoring rate limit (per IP per minute)");
 
     if let Some(client) = state.model.clone() {
         tokio::spawn(prewarm(client));
     }
 
-    Router::new()
-        .route("/health", get(health))
-        .route("/", get(root))
-        .route("/api", get(api_info))
+    // Only the routes that spend model calls are limited. /health must stay open — the
+    // keep-warm pinger hits it every 10 min and a 429 there would let the service sleep.
+    // /demo/* and / are static and free.
+    let scoring = Router::new()
         .route("/score/agent", post(score_agent_handler))
         .route("/score/rag", post(score_rag_handler))
         // Streaming variants (§9.5). Kept as separate routes rather than content
@@ -49,7 +133,14 @@ pub fn build_app() -> Router {
         // scripts/stress.sh, every curl in the README — keeps working untouched.
         .route("/score/agent/stream", post(score_agent_stream))
         .route("/score/rag/stream", post(score_rag_stream))
+        .route_layer(middleware::from_fn_with_state(state.clone(), rate_limit_mw));
+
+    Router::new()
+        .route("/health", get(health))
+        .route("/", get(root))
+        .route("/api", get(api_info))
         .route("/demo/{id}", get(demo_handler))
+        .merge(scoring)
         .with_state(state)
 }
 
