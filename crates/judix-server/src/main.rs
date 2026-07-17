@@ -97,7 +97,7 @@ async fn score_rag_handler(
                 StatusCode::NOT_IMPLEMENTED,
                 Json(json!({
                     "status": "model_required",
-                    "message": "RAG scoring needs the model layer. Set JUDIX_BASE_URL to your OmniRoute endpoint to enable it."
+                    "message": "RAG scoring needs the model layer (claim decomposition + verification). Set JUDIX_BASE_URL and JUDIX_API_KEY to an OpenAI-compatible endpoint (e.g. Gemini) to enable it."
                 })),
             )
         }

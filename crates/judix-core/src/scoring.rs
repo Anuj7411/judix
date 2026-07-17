@@ -30,24 +30,29 @@ fn rag_weight(metric_name: &str) -> f32 {
 
 /// Weighted average over the available (non-`na`) metrics, weights renormalized
 /// to sum to 1 across whatever is present. Returns `None` if nothing is available.
+///
+/// Accumulates in `f64` and clamps to 0–100. Renormalizing divides by a sum of
+/// weights that can't be represented exactly in binary (e.g. a clean tool step is
+/// `(100*0.30 + 100*0.15) / 0.45`), which in `f32` yields **100.00001** — a public
+/// API that advertises 0–100 must never emit that.
 fn weighted_average(metrics: &[MetricResult], weight_of: impl Fn(&str) -> f32) -> Option<f32> {
-    let mut num = 0.0f32;
-    let mut den = 0.0f32;
+    let mut num = 0.0f64;
+    let mut den = 0.0f64;
     for m in metrics {
         if m.na {
             continue;
         }
-        let w = weight_of(&m.name);
+        let w = weight_of(&m.name) as f64;
         if w == 0.0 {
             continue;
         }
-        num += m.score * w;
+        num += m.score as f64 * w;
         den += w;
     }
     if den == 0.0 {
         None
     } else {
-        Some(num / den)
+        Some(((num / den) as f32).clamp(0.0, 100.0))
     }
 }
 
@@ -156,7 +161,8 @@ pub fn score_agent(
     let mut run_quality = if available.is_empty() {
         0.0
     } else {
-        available.iter().sum::<f32>() / available.len() as f32
+        let sum: f64 = available.iter().map(|q| *q as f64).sum();
+        ((sum / available.len() as f64) as f32).clamp(0.0, 100.0)
     };
     // Cap at 59 if any step has a critical FAIL (loop or tool_call FAIL) (§5.4).
     if any_critical_fail {

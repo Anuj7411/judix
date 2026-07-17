@@ -51,7 +51,7 @@
     <!-- Legend -->
     <div class="flex items-center gap-5 text-xs text-slate-500 mb-4">
       <span>▮ <span class="text-slate-400">computed by Rust — real, $0</span></span>
-      <span>▮ <span class="text-slate-400">model explanation — needs a key (coming)</span></span>
+      <span>▮ <span class="text-slate-400">model explanation — the "why"</span></span>
     </div>
 
     <!-- Results -->
@@ -131,7 +131,7 @@
               }
               return `<div class="pl-9 mt-2 text-xs text-slate-500 flex items-start gap-2">
                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/60 text-slate-500 border border-slate-700/60">model</span>
-                <span>relevance &amp; goal-drift explanations appear when OmniRoute is connected.</span>
+                <span>relevance &amp; goal-drift explanations appear when a model key is configured.</span>
               </div>`;
             })()}
           </div>`;
@@ -207,7 +207,7 @@
         results.innerHTML = `
           <div class="rounded-xl border border-amber-700/60 bg-amber-900/20 p-4 text-sm text-amber-200">
             <b>RAG faithfulness is model-powered.</b> The deterministic engine handles agent trajectories at $0;
-            RAG scoring lights up once <code>JUDIX_BASE_URL</code> points at OmniRoute.
+            RAG scoring lights up once <code>JUDIX_API_KEY</code> points at an OpenAI-compatible model endpoint (Gemini / Groq).
             <div class="mt-2 text-xs text-amber-300/80 mono">${body.message || ''}</div>
           </div>`;
         return;

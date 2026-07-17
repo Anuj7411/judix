@@ -12,14 +12,23 @@ authors = ["Judix"]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "native-tls"] }
+# rustls, not native-tls: native-tls drags OpenSSL (a C toolchain + libssl-dev) into
+# the image build, which is the heaviest part of a constrained free-tier builder and
+# needs matching libssl at runtime. rustls is pure Rust — smaller build, smaller image,
+# no system TLS deps.
+reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "rustls-tls"] }
 moka = { version = "0.12", features = ["future"] }
 sha2 = "0.10"
 jsonschema = "0.20"
 futures = "0.3"
-anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [profile.release]
-opt-level = 2
+# Tuned for BUILD cost, not peak runtime speed. Judix's wall-clock is dominated by
+# network round-trips to the model providers (~1.5s each); the deterministic engine
+# is microseconds either way. opt-level 2 -> 1 buys nothing measurable here and cuts
+# compile memory/time substantially, which matters on a free-tier builder.
+opt-level = 1
+debug = false
+strip = true

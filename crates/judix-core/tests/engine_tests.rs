@@ -121,6 +121,40 @@ fn wrong_tool_demo_fails_tool_check_and_flags_loops() {
 // RAG faithfulness ratio + cap (§5.5) — testable without a model
 // ---------------------------------------------------------------------------
 
+/// Every score the engine emits must lie inside the 0–100 range it advertises.
+/// The clean demo used to report run_quality = 100.00001: renormalizing a weighted
+/// average divides by a sum of weights with no exact binary representation, and the
+/// existing one-sided `>= 80.0` assertion happily accepted the overflow.
+#[test]
+fn all_scores_stay_within_0_to_100() {
+    for name in ["clean.json", "wrong_tool.json"] {
+        let trace = load_trace(name);
+        let report = score_agent(&trace, &[], 0, 0.0);
+        assert!(
+            (0.0..=100.0).contains(&report.run_quality),
+            "{name}: run_quality {} outside 0..=100",
+            report.run_quality
+        );
+        for s in &report.steps {
+            assert!(
+                (0.0..=100.0).contains(&s.step_quality),
+                "{name}: step {} quality {} outside 0..=100",
+                s.index,
+                s.step_quality
+            );
+            for m in &s.metrics {
+                assert!(
+                    (0.0..=100.0).contains(&m.score),
+                    "{name}: step {} metric {} score {} outside 0..=100",
+                    s.index,
+                    m.name,
+                    m.score
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn faithfulness_ratio_math() {
     assert_eq!(faithfulness_ratio(1, 2), 50.0);

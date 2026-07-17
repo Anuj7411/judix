@@ -149,28 +149,25 @@ fn validate_all_args(trace: &AgentTrace, calls: &[ToolCallView]) -> (bool, Vec<S
     let mut errors = Vec::new();
     for call in calls {
         if let Some(schema) = schemas.get(&call.name) {
-            match jsonschema::validator_for(schema) {
-                Ok(validator) => {
-                    // `validate` returns the validation errors as an iterator in
-                    // its `Err` arm; collect them into a readable reason.
-                    if let Err(errs) = validator.validate(&call.args) {
-                        all_ok = false;
-                        let detail: Vec<String> = errs.map(|e| e.to_string()).collect();
-                        errors.push(format!(
-                            "{} (step {}): {}",
-                            call.name,
-                            call.index,
-                            if detail.is_empty() {
-                                "schema violation".to_string()
-                            } else {
-                                detail.join(", ")
-                            }
-                        ));
-                    }
+            // A malformed schema can't validate anything — skip it rather than
+            // punishing the agent for a bad golden label.
+            if let Ok(validator) = jsonschema::validator_for(schema) {
+                // `validate` returns the validation errors as an iterator in its
+                // `Err` arm; collect them into a readable reason.
+                if let Err(errs) = validator.validate(&call.args) {
+                    all_ok = false;
+                    let detail: Vec<String> = errs.map(|e| e.to_string()).collect();
+                    errors.push(format!(
+                        "{} (step {}): {}",
+                        call.name,
+                        call.index,
+                        if detail.is_empty() {
+                            "schema violation".to_string()
+                        } else {
+                            detail.join(", ")
+                        }
+                    ));
                 }
-                // A malformed schema can't validate anything — skip it rather than
-                // punishing the agent for a bad golden label.
-                Err(_) => {}
             }
         }
     }

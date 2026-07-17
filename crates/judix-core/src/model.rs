@@ -89,11 +89,12 @@ struct Msg {
 
 impl Msg {
     fn text(&self) -> String {
-        for c in [&self.content, &self.reasoning_content, &self.reasoning] {
-            if let Some(s) = c {
-                if !s.trim().is_empty() {
-                    return s.clone();
-                }
+        for s in [&self.content, &self.reasoning_content, &self.reasoning]
+            .into_iter()
+            .flatten()
+        {
+            if !s.trim().is_empty() {
+                return s.clone();
             }
         }
         String::new()
@@ -231,7 +232,7 @@ impl ModelClient {
 
     /// Per-model list-price rate (USD per 1M tokens: input, output). Free-tier use
     /// bills $0, but exposing the notional cost lets the UI say "this would cost
-    /// $X at list price — you paid $0." Unknown models (e.g. local OmniRoute) → 0.
+    /// $X at list price — you paid $0." Unknown / self-hosted models → 0.
     fn rate(model: &str) -> (f64, f64) {
         let m = model.to_lowercase();
         if m.contains("gemini") && m.contains("flash") {

@@ -1,7 +1,12 @@
 name: keep-warm
 
-# Pings the live Render service every ~10 minutes so it never hits the free-tier
-# 15-minute idle timeout — judges always get an instant response, no cold start.
+# Pings the live Render service to fend off the free-tier 15-minute idle timeout.
+#
+# CAVEAT (measured, not assumed): GitHub throttles scheduled workflows hard on public
+# repos — observed actual gaps between runs were ~1.5-3 HOURS, not the 10 minutes this
+# cron requests. So this reduces cold starts but cannot eliminate them. For a
+# guaranteed warm service, point an external pinger (e.g. cron-job.org or UptimeRobot,
+# both free) at https://judix-8piu.onrender.com/health on a 5-10 minute interval.
 on:
   schedule:
     - cron: "*/10 * * * *"

@@ -1,0 +1,26 @@
+name: ci
+
+# The deterministic engine is the product's core claim, so it gets gated on every
+# push: it must build clean, pass clippy with no warnings, and keep all engine tests
+# green. No network needed — the `model` feature is off by default.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --locked --all-targets
+      - name: Clippy (deny warnings)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Test
+        run: cargo test --all
