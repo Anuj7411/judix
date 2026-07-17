@@ -24,3 +24,52 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Test
         run: cargo test --all
+
+  # Deploy by explicitly calling Render's Deploy Hook, because Render's own
+  # GitHub auto-deploy webhook is dead on this service: its Events page showed exactly
+  # two entries — the first deploy and nothing since — while Auto-Deploy read
+  # "On Commit". Not one failed build; no build ATTEMPTS at all. A full day of pushes
+  # silently never shipped, and the live site served a build ~10 commits stale.
+  #
+  # This makes the trigger explicit and, crucially, VERIFIED: it polls /health until the
+  # running commit matches the one we just pushed. A deploy that doesn't land turns this
+  # job red instead of failing in silence.
+  #
+  # Setup (one time): Render dashboard -> judix -> Settings -> Deploy -> copy the Deploy
+  # Hook URL, then add it in GitHub -> Settings -> Secrets and variables -> Actions as
+  # RENDER_DEPLOY_HOOK. It's a secret: anyone with it can trigger deploys.
+  deploy:
+    needs: test # never ship a red build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK secret is not set — add it in repo Settings > Secrets > Actions, or deploys will keep needing a manual click."
+            exit 1
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "deploy triggered for ${GITHUB_SHA:0:7}"
+
+      - name: Wait until the pushed commit is actually live
+        env:
+          URL: https://judix-8piu.onrender.com/health
+        run: |
+          want="${GITHUB_SHA:0:7}"
+          echo "waiting for commit $want at $URL"
+          # Render builds this in ~2min; allow generous headroom for a queued build.
+          for i in $(seq 1 60); do
+            got=$(curl -fsS --max-time 30 "$URL" 2>/dev/null | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p' || true)
+            if [ "$got" = "$want" ]; then
+              echo "::notice::deployed $want is live"
+              curl -fsS "$URL"; echo
+              exit 0
+            fi
+            echo "  [$i/60] live=${got:-unreachable} want=$want"
+            sleep 15
+          done
+          echo "::error::$want never went live (last seen: ${got:-unreachable}). Check Render -> judix -> Events for a failed or missing build."
+          exit 1

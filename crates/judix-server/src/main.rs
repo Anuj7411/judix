@@ -119,6 +119,14 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
         "model_layer": if state.model.is_some() { "enabled" } else { "disabled (set JUDIX_API_KEY)" },
         "model_fast": std::env::var("JUDIX_MODEL_FAST").unwrap_or_else(|_| "-".into()),
+        // Which commit is ACTUALLY serving traffic. Render injects RENDER_GIT_COMMIT.
+        // Without this a stale deploy is invisible — this service silently served a
+        // build from ~10 commits back for a full day because nothing reported the
+        // running SHA. The deploy workflow polls this to prove a deploy really landed.
+        "commit": std::env::var("RENDER_GIT_COMMIT")
+            .ok()
+            .map(|c| c.chars().take(7).collect::<String>())
+            .unwrap_or_else(|| "local".into()),
     }))
 }
 
