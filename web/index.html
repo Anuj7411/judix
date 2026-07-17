@@ -30,6 +30,7 @@
     --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --sans: "IBM Plex Sans", system-ui, sans-serif;
     --display: "Space Grotesk", var(--sans);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -82,9 +83,9 @@
   .verdict { display: flex; align-items: flex-start; gap: 22px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--line-soft); }
   .score-block { min-width: 168px; }
   .score-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-faint); }
-  .score-n { font-family: var(--display); font-weight: 700; font-size: 58px; line-height: 0.95; letter-spacing: -0.03em; margin-top: 4px; font-variant-numeric: tabular-nums; transition: color .35s ease; }
+  .score-n { font-family: var(--display); font-weight: 700; font-size: 58px; line-height: 0.95; letter-spacing: -0.03em; margin-top: 4px; font-variant-numeric: tabular-nums slashed-zero; }
   .score-n small { font-size: 20px; color: var(--ink-faint); font-weight: 500; }
-  .settle { animation: settle .38s ease-out; }
+  .settle { animation: settle .26s var(--ease-out); }
   @keyframes settle { from { opacity: .35; transform: translateY(2px); } to { opacity: 1; transform: none; } }
   .band-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 9px; border-radius: 5px; }
   .meta { margin-left: auto; text-align: right; color: var(--ink-faint); font-size: 12.5px; line-height: 1.7; }
@@ -180,9 +181,55 @@
   button.primary:hover { opacity: 0.9; }
   button.primary:active { transform: scale(0.97); }
 
+  /* ===== motion: transform/opacity only, <300ms, strong ease-out ===== */
+  /* item 2, the signature: model chips fade+slide in a beat after the Rust chips snap in */
+  .chip-in { animation: chip-in .22s var(--ease-out) both; }
+  .reason-in { animation: chip-in .22s var(--ease-out) both; }
+  @keyframes chip-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+  /* item 4, quiet: a thin red underline draws under a failed tool name */
+  .step { position: relative; }
+  .step-name.strike::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1.5px;
+    background: var(--red); border-radius: 1px; transform-origin: left; transform: scaleX(1);
+    animation: draw-x .2s var(--ease-out);
+  }
+  @keyframes draw-x { from { transform: scaleX(0); } }
+
+  /* item 4, quiet: the step rail marker pulses once */
+  .idx.pulse { animation: idx-pulse .3s var(--ease-out); }
+  @keyframes idx-pulse { 0% { transform: scale(1); } 45% { transform: scale(1.32); } 100% { transform: scale(1); } }
+
+  /* item 5: a repeated step emits one faint concentric ring (single shot) */
+  .echo { position: absolute; left: 3px; top: 12px; width: 26px; height: 26px; border-radius: 8px;
+          border: 1.5px solid var(--red); pointer-events: none; opacity: 0; z-index: 0; }
+  .echo.go { animation: echo-ring .3s var(--ease-out) forwards; }
+  @keyframes echo-ring { from { transform: scale(.82); opacity: .5; } to { transform: scale(1.7); opacity: 0; } }
+
+  /* item 3, signature: red background wipe reveals left to right on a hallucinated span */
+  .answer .sp.contra, .answer .sp.unsup { position: relative; display: inline-block; background: transparent; box-shadow: none; }
+  .answer .sp.contra { color: var(--red); font-weight: 600; }
+  .answer .sp.unsup { color: var(--amber); }
+  .answer .sp.contra > .wbg, .answer .sp.unsup > .wbg {
+    position: absolute; inset: 0; z-index: 0; border-radius: 3px; transform-origin: left; transform: scaleX(1); }
+  .answer .sp.contra > .wbg { background: var(--red-bg); box-shadow: inset 0 -2px 0 var(--red); }
+  .answer .sp.unsup > .wbg { background: var(--amber-bg); box-shadow: inset 0 -2px 0 var(--amber); }
+  .answer .sp > .tx { position: relative; z-index: 1; }
+  .answer .sp.wipe > .wbg { animation: wipe-x .26s var(--ease-out); }
+  @keyframes wipe-x { from { transform: scaleX(0); } }
+
+  /* item 6, quiet: client-measured latency ticks up, then freezes and dims */
+  .tick { margin-left: 10px; font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; font-size: 12.5px; color: var(--ink-dim); }
+  .tick.froze { color: var(--ink-faint); opacity: .8; }
+
+  /* item 11, quiet: primary button nudges toward the cursor, presses on active */
+  button.primary { transform: translate(var(--mx, 0), var(--my, 0)); }
+  button.primary:active { transform: translate(var(--mx, 0), var(--my, 0)) scale(0.97); }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.01ms !important; transition-duration: 0.06ms !important; }
     .dot { animation: none; opacity: 0.6; }
+    button.primary { transform: none; }
   }
 </style>
 
@@ -207,6 +254,7 @@
     <button class="demo" data-demo="clean" data-kind="agent" data-band="green"><i class="i ph ph-check-circle"></i>Clean run</button>
     <button class="demo" data-demo="rag_hallucination" data-kind="rag" data-band="red"><i class="i ph ph-quotes"></i>RAG hallucination</button>
     <span class="status" id="status"></span>
+    <span class="tick" id="tick" aria-hidden="true"></span>
   </div>
 
   <section id="out">
@@ -243,6 +291,63 @@
   const bandClass = b => b === 'green' ? 'green' : b === 'amber' ? 'amber' : 'red';
   const round1 = n => (Math.round(n * 10) / 10);
   const cssBand = b => b === 'green' ? 'var(--green)' : b === 'amber' ? 'var(--amber)' : 'var(--red)';
+
+  // ===== motion helpers. Every effect is gated on MOTION; reduced motion shows final states. =====
+  const MOTION = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // exact cubic-bezier(0.23, 1, 0.32, 1), Newton-solved, so JS eases match the CSS --ease-out.
+  const EASE = (() => {
+    const p1x = .23, p1y = 1, p2x = .32, p2y = 1;
+    const cx = 3 * p1x, bx = 3 * (p2x - p1x) - cx, ax = 1 - cx - bx;
+    const cy = 3 * p1y, by = 3 * (p2y - p1y) - cy, ay = 1 - cy - by;
+    const fx = t => ((ax * t + bx) * t + cx) * t, dfx = t => (3 * ax * t + 2 * bx) * t + cx, fy = t => ((ay * t + by) * t + cy) * t;
+    return x => { let t = x; for (let i = 0; i < 6; i++) { const e = fx(t) - x; if (Math.abs(e) < 1e-4) break; const d = dfx(t); if (Math.abs(d) < 1e-6) break; t -= e / d; } return fy(Math.max(0, Math.min(1, t))); };
+  })();
+
+  // Item 1: the mono verdict rolls from its previous value to the new one, band saturating in via
+  // opacity. On the deterministic paint it rolls from 0; on done it rolls from the Rust value to the
+  // recomposed value, so the score visibly settles when deterministic is superseded (Architecture 12.6).
+  function countUp(el, to, opt) {
+    opt = opt || {}; if (!el || to == null) return;
+    const from = opt.from != null ? opt.from : (el.dataset.to != null ? parseFloat(el.dataset.to) : 0);
+    el.dataset.to = to;
+    const dur = opt.dur || 280;
+    const paint = v => { el.innerHTML = (Math.round(v * 10) / 10) + '<small>/100</small>'; };
+    if (!MOTION) { paint(to); el.style.opacity = ''; return; }
+    const start = performance.now();
+    el.style.opacity = '0.4';
+    (function frame(now) {
+      let p = (now - start) / dur; if (p > 1) p = 1; const e = EASE(p);
+      paint(from + (to - from) * e);
+      el.style.opacity = (0.4 + 0.6 * e).toFixed(3);
+      if (p < 1) requestAnimationFrame(frame); else { paint(to); el.style.opacity = '1'; }
+    })(performance.now());
+  }
+
+  // Item 6: latency ticker on the CLIENT-measured round trip, never latency_ms (cached is 0, hazard 9.1).
+  let tickRAF = null;
+  function startTicker(t0) {
+    const el = $('#tick'); if (!el) return;
+    el.classList.remove('froze');
+    if (!MOTION) { el.textContent = ''; return; }
+    cancelAnimationFrame(tickRAF);
+    (function loop() { el.textContent = Math.round(performance.now() - t0) + ' ms'; tickRAF = requestAnimationFrame(loop); })();
+  }
+  function stopTicker(t0) {
+    const el = $('#tick'); if (!el) return;
+    cancelAnimationFrame(tickRAF); tickRAF = null;
+    el.textContent = Math.round(performance.now() - t0) + ' ms'; el.classList.add('froze');
+  }
+
+  // Item 11: magnetic nudge toward the cursor (pointer only, so no keyboard-initiated animation).
+  if (MOTION) document.querySelectorAll('button.primary').forEach(b => {
+    b.addEventListener('pointermove', e => {
+      const r = b.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2) * 2;
+      const dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2) * 2;
+      b.style.setProperty('--mx', dx.toFixed(2) + 'px'); b.style.setProperty('--my', dy.toFixed(2) + 'px');
+    });
+    b.addEventListener('pointerleave', () => { b.style.setProperty('--mx', '0px'); b.style.setProperty('--my', '0px'); });
+  });
 
   // The report does not echo goal or args (section 14.1), so keep the posted trace.
   let posted = null;
@@ -335,11 +440,14 @@
       const inp = (posted && posted.steps && posted.steps[i]) || {};
       const b = s.na ? '' : bandClass(s.band);
       const det = s.metrics.filter(m => m.source === 'deterministic');
+      const looped = !s.na && s.metrics.some(m => m.name === 'loop_free' && m.pass === false);
+      const isTool = inp.kind === 'tool_call';
       html += `<div class="step ${s.na ? 'na' : ''}" data-band="${b}" data-i="${i}">
-        <div class="idx">${i}</div>
+        ${MOTION && looped ? '<span class="echo go" aria-hidden="true"></span>' : ''}
+        <div class="idx${MOTION && b === 'red' ? ' pulse' : ''}">${i}</div>
         <div>
           <div class="step-head">
-            <span class="step-name">${esc(s.label)}</span>
+            <span class="step-name${MOTION && isTool && b === 'red' ? ' strike' : ''}">${esc(s.label)}</span>
             <span class="step-kind">${esc(inp.kind || '')}</span>
             <span class="step-q">${s.na ? 'skipped' : 'step ' + round1(s.step_quality)}</span>
           </div>`;
@@ -357,6 +465,7 @@
     html += `</div>`;
     out.innerHTML = html;
     updateMeta(report, t0, false);
+    countUp($('#headline'), report.run_quality, { from: 0 });
   }
 
   function updateMeta(report, t0, final) {
@@ -376,21 +485,27 @@
     if (!lane) return;
     const slot = lane.querySelector(`[data-metric="${metric.name}"]`);
     const holder = document.createElement('span'); holder.innerHTML = scoreChip(metric);
-    if (slot) slot.replaceWith(holder.firstChild); else lane.appendChild(holder.firstChild);
+    const node = holder.firstChild;
+    if (MOTION && node && node.classList) node.classList.add('chip-in');
+    if (slot) slot.replaceWith(node); else lane.appendChild(node);
     if (metric.reason) {
       const r = out.querySelector(`[data-reason="${step_index}"]`);
-      if (r) { r.style.display = 'flex'; r.innerHTML = `<span class="tag">model</span><span>${esc(metric.reason)}</span>`; }
+      if (r) {
+        r.style.display = 'flex'; r.innerHTML = `<span class="tag">model</span><span>${esc(metric.reason)}</span>`;
+        if (MOTION) { r.classList.remove('reason-in'); void r.offsetWidth; r.classList.add('reason-in'); }
+      }
     }
   }
 
   function settleHeadline(report) {
     const h = $('#headline'), bt = $('#headband');
-    if (h) { h.className = `score-n band-${bandClass(report.band)} settle`; h.innerHTML = `${round1(report.run_quality)}<small>/100</small>`; }
+    if (h) { h.className = `score-n band-${bandClass(report.band)}`; countUp(h, report.run_quality); }
     if (bt) { bt.className = `band-tag bg-${bandClass(report.band)}`; bt.textContent = clean(report.band); }
   }
 
   async function scoreAgent(trace) {
     posted = trace; setStatus('scoring, Rust first, model streaming in'); const t0 = performance.now(); let painted = false;
+    startTicker(t0);
     await stream('/score/agent/stream', trace, (ev, d) => {
       if (ev === 'http') return httpError(d);
       if (ev === 'neterr') return errNotice(d.message);
@@ -399,6 +514,7 @@
       else if (ev === 'done') { if (!painted) renderAgentShell(d, t0); settleHeadline(d); updateMeta(d, t0, true); setStatus(`done in ${Math.round(performance.now() - t0)} ms`); }
       else if (ev === 'error') errNotice(clean(d.message));
     });
+    stopTicker(t0);
   }
 
   // ===== RAG =====
@@ -407,15 +523,24 @@
     const lc = m.low_confidence ? '<span class="lc" title="escalated to the strong model">escalated</span>' : '';
     return `<span class="chip"><span class="cn">${esc(m.name)}</span><span class="cv band-${bandClass(m.band)}">${Math.round(m.score)}</span>${lc}</span>`;
   }
+  // Item 3: slice by start/end offsets (hazard 9.2, never match by text). Contradicted and unsupported
+  // segments get a background wipe that reveals left to right; supported segments stay calm (no wipe).
   function renderAnswerSpans(answer, spans, pending) {
     const located = (spans || []).filter(s => s.end > s.start).sort((a, b) => a.start - b.start);
     let html = '', cur = 0;
     for (const s of located) {
       if (s.start < cur) continue;
       html += esc(answer.slice(cur, s.start));
-      const kind = pending ? 'pend' : s.contradicted ? 'contra' : s.supported ? 'sup' : 'unsup';
-      const t = pending ? 'checking' : s.contradicted ? 'contradicts the context' : s.supported ? 'grounded' : 'no evidence';
-      html += `<span class="sp ${kind}" title="${t}">${esc(answer.slice(s.start, s.end))}</span>`;
+      const seg = esc(answer.slice(s.start, s.end));
+      if (pending) {
+        html += `<span class="sp pend" title="checking">${seg}</span>`;
+      } else if (s.contradicted || s.supported === false) {
+        const kind = s.contradicted ? 'contra' : 'unsup';
+        const t = s.contradicted ? 'contradicts the context' : 'no evidence';
+        html += `<span class="sp ${kind}${MOTION ? ' wipe' : ''}" title="${t}"><span class="wbg"></span><span class="tx">${seg}</span></span>`;
+      } else {
+        html += `<span class="sp sup" title="grounded">${seg}</span>`;
+      }
       cur = s.end;
     }
     html += esc(answer.slice(cur));
@@ -443,7 +568,7 @@
     let html = `<div class="verdict">
       <div class="score-block">
         <div class="score-k">RAG quality</div>
-        <div class="score-n band-${bandClass(report.band)} settle">${round1(report.rag_quality)}<small>/100</small></div>
+        <div class="score-n band-${bandClass(report.band)}" id="ragheadline">${round1(report.rag_quality)}<small>/100</small></div>
         <span class="band-tag bg-${bandClass(report.band)}">${esc(report.band)}</span>
       </div>
       <div class="meta">
@@ -468,6 +593,7 @@
     const reasons = q.filter(m => m.reason);
     if (reasons.length) html += reasons.map(m => `<div class="reason" style="display:flex"><span class="tag">${esc(m.name)}</span><span>${esc(m.reason)}</span></div>`).join('');
     out.innerHTML = html;
+    countUp($('#ragheadline'), report.rag_quality, { from: 0 });
   }
 
   function showRagPending(triple, claims) {
@@ -482,6 +608,7 @@
 
   async function scoreRag(triple) {
     posted = triple; setStatus('scoring, decomposing the answer then grounding each claim'); const t0 = performance.now();
+    startTicker(t0);
     await stream('/score/rag/stream', triple, (ev, d) => {
       if (ev === 'http') return httpError(d);
       if (ev === 'neterr') return errNotice(d.message);
@@ -489,6 +616,7 @@
       else if (ev === 'done') { renderRag(d, t0); setStatus(`done in ${Math.round(performance.now() - t0)} ms`); }
       else if (ev === 'error') { if (d.status === 'model_required') model501(d); else errNotice(clean(d.message)); }
     });
+    stopTicker(t0);
   }
 
   // ===== errors / notices =====
