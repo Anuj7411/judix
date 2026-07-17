@@ -19,7 +19,7 @@
 use crate::cache::ModelCache;
 use crate::deterministic;
 use crate::types::{AgentTrace, ClaimSpan, MetricResult, MetricSource, RagTriple};
-use futures::future;
+use futures::StreamExt;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -52,8 +52,11 @@ const MAX_BACKOFF_MS: u64 = 12_000;
 //
 // Set them generously enough that a truncated response (which fails to parse and costs a
 // retry) stays impossible.
-/// `{score, confidence, reason}` — one short sentence.
-const MAX_TOKENS_SCORE: u32 = 256;
+/// `{score, confidence, reason}` — one short sentence. Measured completions are ~25-50
+/// tokens; 160 is ~3x headroom against truncation while costing a third of the old 2048.
+const MAX_TOKENS_SCORE: u32 = 160;
+/// Two `{score, confidence, reason}` objects in one response.
+const MAX_TOKENS_STEP_PAIR: u32 = 320;
 /// A claims array with a verbatim quote per claim.
 const MAX_TOKENS_DECOMPOSE: u32 = 1536;
 /// One verdict object per claim.
@@ -77,19 +80,34 @@ const PROVIDER_COOLDOWN_SECS: u64 = 45;
 /// local, and O(n), so trace size is only ever a threat via the model layer.
 const DEFAULT_MAX_MODEL_STEPS: usize = 40;
 
-/// §7.2 — judge one step against the goal, including constraints encoded in tool args.
-const REL_SYS: &str = "You evaluate ONE step of an AI agent's trajectory against the user's GOAL. \
-    The goal may contain explicit constraints (e.g. 'avoiding downtown'). Rate how relevant \
-    and necessary this step is to achieving the goal. HEAVILY penalize any step that violates \
-    an explicit constraint in the goal, and penalize steps that make no progress. \
-    Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
-    100 = essential and compliant, 50 = tangential, 0 = irrelevant or constraint-violating.";
+/// How many recent steps of the trajectory `goal_drift` sees.
+///
+/// Fixes real O(n²) token growth: goal_drift for step *i* used to carry steps 0..i, so a
+/// trace's total prompt cost grew with the square of its length — a 40-step trace billed
+/// ~43k tokens (2 evals/day on a 100k/day tier) versus ~4k for a 5-step one. Drift is a
+/// question about *recent* behaviour ("is it still pursuing the goal, or looping?"), and
+/// the goal itself is always sent in full, so a bounded window answers it just as well at
+/// O(n) total cost. Loop detection over the whole trace is the deterministic engine's job
+/// anyway — free, exact, and unbounded.
+const TRAJECTORY_WINDOW: usize = 8;
 
-/// §7.3 — judge the trajectory so far against the original goal.
-const DRIFT_SYS: &str = "You evaluate whether an AI agent is still pursuing its ORIGINAL GOAL given \
-    the TRAJECTORY so far. Respond ONLY as JSON {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. \
-    100 = fully on the original goal, 0 = fully drifted or abandoned. Penalize repeated \
-    no-progress actions and constraint violations.";
+/// §7.2 + §7.3 — both per-step judgements in ONE call.
+///
+/// They were two calls, which doubled the request count *and* re-sent the system prompt
+/// and goal twice per step. Merged, they cost one prompt and one `max_tokens` reservation
+/// while still producing two independent `MetricResult`s. The model also sees both
+/// questions at once, which is if anything better-informed.
+const STEP_SYS: &str = "You evaluate ONE step of an AI agent's trajectory. Return TWO judgements.\n\
+    1. step_relevance — is this STEP relevant and necessary to the GOAL? The goal may contain \
+    explicit constraints (e.g. 'avoiding downtown'); HEAVILY penalize any step that violates one, \
+    and penalize steps that make no progress. 100 = essential and compliant, 50 = tangential, \
+    0 = irrelevant or constraint-violating.\n\
+    2. goal_drift — given RECENT STEPS, is the agent still pursuing the ORIGINAL GOAL? \
+    100 = fully on goal, 0 = fully drifted or abandoned. Penalize repeated no-progress actions \
+    and constraint violations.\n\
+    Respond ONLY as JSON: \
+    {\"step_relevance\":{\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"},\
+    \"goal_drift\":{\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}}";
 
 /// §7.5 — does the answer address the question?
 const AR_SYS: &str = "Rate how directly the ANSWER addresses the QUESTION. Respond ONLY as JSON \
@@ -107,18 +125,36 @@ const CR_SYS: &str = "Given the QUESTION, the CONTEXTS, and the ANSWER, rate con
     {\"score\":0-100,\"confidence\":0.0-1.0,\"reason\":\"one short sentence\"}. 100 = fully covered, 0 = key info missing.";
 
 /// One OpenAI-compatible endpoint (base URL + key + model name).
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct Provider {
     base_url: String,
     api_key: String,
     model: String,
 }
 
+impl Provider {
+    /// Same endpoint *and* model — used to dedupe the pool so a single-provider setup
+    /// doesn't call itself twice per attempt.
+    fn same_as(&self, other: &Provider) -> bool {
+        self.base_url == other.base_url && self.model == other.model
+    }
+}
+
 #[derive(Clone)]
 pub struct ModelClient {
     http: Client,
+    /// Primary judge.
     fast: Provider,
+    /// Escalation target for low-confidence checks.
     strong: Provider,
+    /// The full failover chain: `[fast, strong, ...extras]`, deduplicated.
+    ///
+    /// Capacity, not redundancy, is why this is a list. Free tiers are small and
+    /// *token*-metered (Gemini 500 req/day; Groq 100k tokens/day), and no amount of
+    /// prompt tuning changes that ceiling — merging two checks into one call bought only
+    /// ~1.2x. Adding an independent provider adds its whole quota. Extras come from
+    /// `JUDIX_EXTRA_PROVIDERS` (JSON), so widening capacity is config, not a code change.
+    pool: Vec<Provider>,
     cache: ModelCache,
     sem: Arc<Semaphore>,
     /// Escalate a check to the strong model when the fast model reports confidence
@@ -214,6 +250,15 @@ fn half() -> f64 {
 }
 fn point_seven() -> f64 {
     0.7
+}
+
+/// Both per-step judgements from a single call.
+#[derive(Deserialize)]
+struct StepPairOut {
+    #[serde(default)]
+    step_relevance: Option<ScoreOut>,
+    #[serde(default)]
+    goal_drift: Option<ScoreOut>,
 }
 
 #[derive(Deserialize)]
@@ -316,10 +361,25 @@ impl ModelClient {
             model: model_strong,
         };
 
+        // Failover chain: primary, escalation, then any extras. Deduped so a
+        // single-provider setup doesn't retry the same endpoint twice per attempt.
+        let mut pool = vec![fast.clone()];
+        for p in std::iter::once(strong.clone()).chain(Self::extra_providers()) {
+            if !pool.iter().any(|q| q.same_as(&p)) {
+                pool.push(p);
+            }
+        }
+        tracing::info!(
+            providers = pool.len(),
+            models = %pool.iter().map(|p| p.model.as_str()).collect::<Vec<_>>().join(", "),
+            "model provider pool"
+        );
+
         Some(Self {
             http: Client::new(),
             fast,
             strong,
+            pool,
             // 6h, not the §8 baseline of 1h: the cache key is
             // (check, model, normalized_input), so an entry is a pure function of its
             // input — TTL is an eviction policy, not a correctness knob, and a stale
@@ -351,6 +411,24 @@ impl ModelClient {
                 .time_to_live(Duration::from_secs(PROVIDER_COOLDOWN_SECS))
                 .build(),
         })
+    }
+
+    /// Additional failover providers from `JUDIX_EXTRA_PROVIDERS`, a JSON array of
+    /// `{base_url, api_key, model}`. Any OpenAI-compatible endpoint works, so adding
+    /// capacity (e.g. a third free tier) is a config change, not a deploy of new code.
+    /// Malformed JSON is logged and ignored rather than taking the service down — the
+    /// deterministic engine must never depend on model config being right.
+    fn extra_providers() -> Vec<Provider> {
+        let Ok(raw) = std::env::var("JUDIX_EXTRA_PROVIDERS") else {
+            return Vec::new();
+        };
+        match serde_json::from_str::<Vec<Provider>>(&raw) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(error = %e, "JUDIX_EXTRA_PROVIDERS is not a valid JSON array of {{base_url, api_key, model}} — ignoring");
+                Vec::new()
+            }
+        }
     }
 
     /// Per-model list-price rate (USD per 1M tokens: input, output). Free-tier use
@@ -478,29 +556,27 @@ impl ModelClient {
         for attempt in 0..=MAX_RETRIES {
             let mut throttle_hint: Option<u64> = None;
 
-            // Prefer a provider that isn't in cooldown. If both are cooling we still try
-            // them (rather than fail instantly) — the breaker is there to reorder work
-            // away from a dead provider, not to refuse to do it.
-            let both = [primary, secondary];
-            let mut order: Vec<&Provider> = both
-                .iter()
-                .copied()
-                .filter(|p| !self.is_cooling(p))
-                .collect();
-            if order.is_empty() {
-                order = both.to_vec();
-            }
-
-            for (idx, provider) in order.into_iter().enumerate() {
-                // Skip the duplicate call when both roles point at one provider.
-                if idx == 1 && secondary.model == primary.model && secondary.base_url == primary.base_url {
-                    continue;
+            // Try `primary` first, then `secondary`, then every other pooled provider —
+            // deduped, and preferring ones that aren't in cooldown. If everything is
+            // cooling we still try (rather than fail instantly): the breaker exists to
+            // reorder work away from a dead provider, not to add a new way to fail.
+            let mut order: Vec<&Provider> = Vec::with_capacity(self.pool.len() + 2);
+            for p in std::iter::once(primary)
+                .chain(std::iter::once(secondary))
+                .chain(self.pool.iter())
+            {
+                if !order.iter().any(|q| q.same_as(p)) {
+                    order.push(p);
                 }
+            }
+            order.sort_by_key(|p| self.is_cooling(p)); // stable: healthy first
+
+            for provider in order {
                 match self.chat_once(provider, check, system, user, max_tokens).await {
                     Ok(out) => {
-                        if idx == 1 {
+                        if !provider.same_as(primary) {
                             tracing::info!(check, from = %primary.model, to = %provider.model,
-                                "failed over to secondary provider");
+                                "failed over to another pooled provider");
                         }
                         self.cache
                             .insert(check, &primary.model, &cache_input, out.text.clone())
@@ -678,13 +754,15 @@ impl ModelClient {
     // Agent checks (§7.2 / §7.3)
     // ------------------------------------------------------------------
 
-    /// Render each step as `(step_description, trajectory_prefix)`.
+    /// Render each step as `(step_description, recent_trajectory)`.
     ///
-    /// Synchronous and cheap, so the async calls that follow have no ordering
-    /// constraint between them: `goal_drift` needs only the trajectory *prefix*, which
-    /// is fully determined here.
+    /// Synchronous and cheap, so the async calls that follow have no ordering constraint
+    /// between them: drift needs only the trajectory *up to* a step, fully determined here.
+    ///
+    /// The trajectory is capped at the last [`TRAJECTORY_WINDOW`] steps. Carrying the full
+    /// prefix made total prompt cost O(n²) in trace length.
     fn prepare_steps(trace: &AgentTrace) -> Vec<(String, String)> {
-        let mut trajectory = String::new();
+        let mut descs: Vec<String> = Vec::with_capacity(trace.steps.len());
         let mut prepared = Vec::with_capacity(trace.steps.len());
         for (i, step) in trace.steps.iter().enumerate() {
             let name = step.name.clone().unwrap_or_else(|| step.kind.clone());
@@ -703,10 +781,100 @@ impl ModelClient {
                 .map(|c| format!(" → {c}"))
                 .unwrap_or_default();
             let step_desc = format!("[{}] {name}{args}{content}", step.kind);
-            trajectory.push_str(&format!("Step {i}: {step_desc}\n"));
-            prepared.push((step_desc, trajectory.clone()));
+            descs.push(format!("Step {i}: {step_desc}"));
+
+            // Only the most recent window, plus a marker so the judge knows the trace
+            // didn't start here and doesn't mistake a truncated view for the whole run.
+            let start = descs.len().saturating_sub(TRAJECTORY_WINDOW);
+            let mut recent = String::new();
+            if start > 0 {
+                recent.push_str(&format!("… ({start} earlier steps omitted)\n"));
+            }
+            recent.push_str(&descs[start..].join("\n"));
+            prepared.push((step_desc, recent));
         }
         prepared
+    }
+
+    /// Both per-step judgements in one call, with the same low-confidence escalation as
+    /// [`scored_check`]: if either judgement is uncertain, the whole step is re-judged on
+    /// the strong provider (one call, not two).
+    async fn step_checks(
+        &self,
+        goal: &str,
+        step_desc: &str,
+        recent: &str,
+    ) -> (MetricResult, MetricResult, f64) {
+        let user =
+            format!("GOAL: {goal}\n\nSTEP: {step_desc}\n\nRECENT STEPS:\n{recent}");
+
+        let (parsed, mut cost) = match self
+            .chat(
+                &self.fast,
+                &self.strong,
+                "step_pair",
+                STEP_SYS,
+                &user,
+                MAX_TOKENS_STEP_PAIR,
+            )
+            .await
+        {
+            Ok(o) => (Self::parse::<StepPairOut>(&o.text), o.cost_usd),
+            Err(e) => return Self::step_pair_na(&format!("model call failed: {e}"), 0.0),
+        };
+
+        let Some(pair) = parsed else {
+            return Self::step_pair_na("unparseable model response", cost);
+        };
+        let (Some(rel), Some(drift)) = (pair.step_relevance, pair.goal_drift) else {
+            return Self::step_pair_na("model response missing a judgement", cost);
+        };
+
+        let uncertain = (rel.confidence as f32) < self.escalate_below
+            || (drift.confidence as f32) < self.escalate_below;
+        if uncertain {
+            if let Ok(o) = self
+                .chat(
+                    &self.strong,
+                    &self.fast,
+                    "step_pair",
+                    STEP_SYS,
+                    &user,
+                    MAX_TOKENS_STEP_PAIR,
+                )
+                .await
+            {
+                cost += o.cost_usd;
+                if let Some(p) = Self::parse::<StepPairOut>(&o.text) {
+                    if let (Some(r), Some(d)) = (p.step_relevance, p.goal_drift) {
+                        let mut rm = Self::to_metric("step_relevance", r);
+                        let mut dm = Self::to_metric("goal_drift", d);
+                        // We escalated because the fast pass was uncertain — flag it.
+                        rm.low_confidence = true;
+                        dm.low_confidence = true;
+                        return (rm, dm, cost);
+                    }
+                }
+            }
+        }
+
+        (
+            Self::to_metric("step_relevance", rel),
+            Self::to_metric("goal_drift", drift),
+            cost,
+        )
+    }
+
+    fn to_metric(name: &str, s: ScoreOut) -> MetricResult {
+        MetricResult::model(name, s.score as f32, s.confidence as f32, s.reason)
+    }
+
+    fn step_pair_na(reason: &str, cost: f64) -> (MetricResult, MetricResult, f64) {
+        (
+            MetricResult::na("step_relevance", MetricSource::Model).with_reason(reason.to_string()),
+            MetricResult::na("goal_drift", MetricSource::Model).with_reason(reason.to_string()),
+            cost,
+        )
     }
 
     /// Score `step_relevance` + `goal_drift` for every step, all model calls fired
@@ -715,15 +883,9 @@ impl ModelClient {
         let prepared = Self::prepare_steps(trace);
         let scored = prepared.len().min(self.max_model_steps);
 
-        let futures = prepared.iter().take(scored).map(|(step_desc, traj)| async move {
-            let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
-            let drift_user = format!("ORIGINAL GOAL: {}\n\nTRAJECTORY SO FAR:\n{traj}", trace.goal);
-            let ((rel, c1), (drift, c2)) = futures::future::join(
-                self.scored_check("step_relevance", REL_SYS, &rel_user),
-                self.scored_check("goal_drift", DRIFT_SYS, &drift_user),
-            )
-            .await;
-            (vec![rel, drift], c1 + c2)
+        let futures = prepared.iter().take(scored).map(|(step_desc, recent)| async move {
+            let (rel, drift, cost) = self.step_checks(&trace.goal, step_desc, recent).await;
+            (vec![rel, drift], cost)
         });
 
         let results = futures::future::join_all(futures).await;
@@ -768,19 +930,17 @@ impl ModelClient {
 
         // Same per-request model-call budget as `score_agent_steps` — streaming must not
         // be a way around the cap.
-        for (i, (step_desc, traj)) in prepared.into_iter().enumerate().take(scored) {
-            let rel_user = format!("GOAL: {}\n\nSTEP: {step_desc}", trace.goal);
-            futs.push(future::Either::Left(async move {
-                let (m, c) = self.scored_check("step_relevance", REL_SYS, &rel_user).await;
-                (i, m, c)
-            }));
-            let drift_user = format!("ORIGINAL GOAL: {}\n\nTRAJECTORY SO FAR:\n{traj}", trace.goal);
-            futs.push(future::Either::Right(async move {
-                let (m, c) = self.scored_check("goal_drift", DRIFT_SYS, &drift_user).await;
-                (i, m, c)
-            }));
+        for (i, (step_desc, recent)) in prepared.into_iter().enumerate().take(scored) {
+            futs.push(async move {
+                let (rel, drift, cost) = self.step_checks(&trace.goal, &step_desc, &recent).await;
+                (i, rel, drift, cost)
+            });
         }
-        futs
+        // One call now yields both metrics; flatten so the SSE contract is unchanged —
+        // callers still receive one (step_index, metric) at a time.
+        futs.flat_map(|(i, rel, drift, cost)| {
+            futures::stream::iter(vec![(i, rel, cost), (i, drift, 0.0)])
+        })
     }
 
     // ------------------------------------------------------------------

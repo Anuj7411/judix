@@ -153,6 +153,7 @@ The model layer is any **OpenAI-compatible** chat API. Two independent providers
 | `JUDIX_STRONG_BASE_URL` | falls back to `JUDIX_BASE_URL` | strong provider base URL, e.g. `https://api.groq.com/openai/v1` |
 | `JUDIX_STRONG_API_KEY` | falls back to `JUDIX_API_KEY` | strong provider key ([console.groq.com](https://console.groq.com), free, no card) |
 | `JUDIX_MODEL_STRONG` | `llama-3.3-70b-versatile` | escalation model |
+| `JUDIX_EXTRA_PROVIDERS` | *(none)* | JSON array of extra failover endpoints — see the pool section |
 | `JUDIX_ESCALATE_BELOW` | `0.6` | re-run a check on the strong model below this confidence |
 | `JUDIX_MAX_MODEL_STEPS` | `40` | max steps per request that get **model** checks (see Security) |
 | `JUDIX_CACHE_TTL_SECS` | `21600` | response-cache TTL |
@@ -194,6 +195,41 @@ Deployed as a Docker image (`rustls`, so no OpenSSL in the image) to Render's fr
 GitHub Actions keep-warm ping so judges don't hit a cold start.
 
 ---
+
+## The model provider pool (why quotas don't take Judix down)
+
+Free tiers are **metered per model, not per account** — Gemini's own 429 says
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier`. Measured, with one Gemini key and
+one Groq key, at a moment when the two headline models were fully exhausted:
+
+| Endpoint | Status at that moment |
+|---|---|
+| `gemini-3.1-flash-lite` | ❌ 429 — day's quota gone |
+| `gemini-2.5-flash` | ✅ 200 — **its own quota** |
+| `gemini-flash-latest` | ✅ 200 — **its own quota** |
+| `llama-3.3-70b-versatile` | ❌ 429 — day's tokens gone |
+| `llama-3.1-8b-instant` | ✅ 200 — **its own quota** |
+| `openai/gpt-oss-120b` | ✅ 200 — **its own quota** |
+
+So capacity is a **config** problem, not a billing one. `JUDIX_EXTRA_PROVIDERS` takes a
+JSON array of `{base_url, api_key, model}`; the pool is `[fast, strong, ...extras]`,
+deduped. On a `429` a call fails over to the next healthy endpoint, and a throttled one is
+put in a 45s cooldown so it stops being tried first. Verified end-to-end on a day when
+both primaries were dead: `wrong_tool → 20.6 red`, `rag → 49.0 red`, cascading
+`gemini-2.5-flash → … → openai/gpt-oss-120b`.
+
+**The floor underneath all of it:** the deterministic engine needs no quota, no key and no
+network. With every provider exhausted, unseen data still scored **47.7 red at
+`deterministic_share` 0.80** — tool-call F1 and loop detection land regardless. A pure
+LLM-judge returns nothing in that state; Judix degrades to "less explanation", never to
+"no answer".
+
+**Token budget matters more than request count.** Providers reserve `max_tokens` against
+your quota whether you use it or not (Groq's 429: prompt 116 + `max_tokens` 2048 =
+`"Requested 2164"`), so a blanket 2048 was burning ~93% of a 100k/day tier to receive
+~50-token replies. Budgets are now sized per check, `goal_drift` sees a bounded
+[8-step window] instead of the whole prefix (which made prompt cost O(n²) in trace
+length), and both per-step judgements share one call.
 
 ## Security
 
