@@ -49,6 +49,11 @@ pub struct ModelClient {
     strong: Provider,
     cache: ModelCache,
     sem: Arc<Semaphore>,
+    /// Escalate a check to the strong model when the fast model reports confidence
+    /// below this (§8 default 0.5, tunable via `JUDIX_ESCALATE_BELOW`). Judges are
+    /// chronically overconfident — Gemini self-reports ≥0.5 even on genuinely
+    /// ambiguous input — so this is exposed rather than hard-coded.
+    escalate_below: f32,
 }
 
 // --- Chat wire types -------------------------------------------------------
@@ -199,6 +204,14 @@ impl ModelClient {
             strong,
             cache: ModelCache::new(1000, 3600),
             sem: Arc::new(Semaphore::new(MAX_CONCURRENCY)),
+            // Empirically 0.6, not the spec's literal 0.5: Gemini expresses "I'm
+            // unsure" as *exactly* 0.5 and never dips below it, so `< 0.5` never
+            // fires and the strong model is never consulted. 0.6 catches that 0.5
+            // uncertainty signal while leaving confident calls (0.7–1.0) alone.
+            escalate_below: std::env::var("JUDIX_ESCALATE_BELOW")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.6),
         })
     }
 
@@ -376,7 +389,7 @@ impl ModelClient {
         };
 
         // Escalate low-confidence fast results to the strong model.
-        if fast.confidence < 0.5 {
+        if (fast.confidence as f32) < self.escalate_below {
             if let Ok(o) = self.chat(&self.strong, check, system, user).await {
                 cost += o.cost_usd;
                 if let Some(strong) = Self::parse::<ScoreOut>(&o.text) {
@@ -468,7 +481,7 @@ impl ModelClient {
             the answer it is drawn from (copied character-for-character, no paraphrasing). \
             Respond ONLY as JSON {\"claims\":[{\"id\":1,\"text\":\"...\",\"quote\":\"...\"}]}.";
         let out = self
-            .chat(&self.strong_or_fast(), "rag_decompose", system, &format!("ANSWER:\n{answer}"))
+            .chat(&self.fast, "rag_decompose", system, &format!("ANSWER:\n{answer}"))
             .await?;
         let parsed: ClaimsOut = Self::parse(&out.text)
             .ok_or_else(|| format!("unparseable decomposition: {}", out.text))?;
@@ -527,10 +540,6 @@ impl ModelClient {
             }
         }
         Ok((statuses, out.cost_usd))
-    }
-
-    fn strong_or_fast(&self) -> Provider {
-        self.strong.clone()
     }
 
     /// Full RAG scoring: faithfulness (decompose → batched verify → ratio in Rust,

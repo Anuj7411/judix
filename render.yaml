@@ -19,12 +19,15 @@ services:
         sync: false
       - key: JUDIX_MODEL_FAST
         value: gemini-3.1-flash-lite
+      # Strong = an INDEPENDENT provider (Groq) so a low-confidence check gets a
+      # genuine second opinion rather than re-asking the model that was unsure.
+      - key: JUDIX_STRONG_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: JUDIX_STRONG_API_KEY
+        sync: false
       - key: JUDIX_MODEL_STRONG
-        value: gemini-3.1-flash-lite
-      # Optional: a separate strong provider (e.g. Groq) for escalation.
-      # - key: JUDIX_STRONG_BASE_URL
-      #   value: https://api.groq.com/openai/v1
-      # - key: JUDIX_STRONG_API_KEY
-      #   sync: false
-      # - key: JUDIX_MODEL_STRONG
-      #   value: llama-3.3-70b-versatile
+        value: llama-3.3-70b-versatile
+      # Escalate to the strong model below this confidence. 0.6, not 0.5: Gemini
+      # floors its uncertainty at exactly 0.5, so the spec's `< 0.5` never fires.
+      - key: JUDIX_ESCALATE_BELOW
+        value: "0.6"
