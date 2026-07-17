@@ -1,18 +1,16 @@
 services:
   - type: web
     name: judix
+    # Must match the live Blueprint-managed service, which builds the Dockerfile from
+    # this repo. (An earlier revision tried `runtime: image` + a prebuilt GHCR image;
+    # Render cannot convert an existing repo-built service to an image-based one in
+    # place, so that only conflicts with the Blueprint. The GHCR image published by
+    # .github/workflows/docker.yml remains available as a portable artifact and as a
+    # fallback if this service is ever recreated.)
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
-    # Deploy a PREBUILT image instead of compiling Rust on Render's builder.
-    #
-    # Why: Render's free-tier builder stopped shipping commits the moment the model
-    # layer pulled in reqwest/tokio/jsonschema — the live service sat ~5 commits stale
-    # while the identical source built clean in ~90s on a standard Linux runner. So the
-    # image is built + smoke-tested by .github/workflows/docker.yml and published to
-    # GHCR (public, anonymously pullable); Render just runs it. Compiling is off the
-    # deploy path entirely, and the artifact is reproducible for anyone: `docker run`.
-    runtime: image
-    image:
-      url: ghcr.io/anuj7411/judix:latest
     healthCheckPath: /health
     autoDeploy: true
     envVars:
