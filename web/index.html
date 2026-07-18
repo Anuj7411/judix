@@ -89,16 +89,20 @@
   .num { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
 
   /* ==================== SHARED SITE NAV ==================== */
-  .nav { border-bottom: 1px solid var(--hairline); background: rgba(246,247,250,.86); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 50; }
-  .nav-in { max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-  @media (max-width: 640px) { .nav-in { padding: 0 20px; } }
+  /* Nav merged into the page: transparent at rest, thin hairline + blur on scroll only. */
+  .nav { border-bottom: 1px solid transparent; background: transparent; position: sticky; top: 0; z-index: 50; transition: background .18s var(--ease-out), border-color .18s var(--ease-out); }
+  .nav.scrolled { background: rgba(255,255,255,.82); backdrop-filter: blur(10px); border-bottom-color: var(--hairline); }
+  .nav-in { max-width: 1240px; margin: 0 auto; padding: 0 40px; height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  @media (max-width: 640px) { .nav-in { padding: 0 20px; height: 60px; } }
   .brand { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
   .brand .mark { display: flex; align-items: center; gap: 9px; }
   /* Chip-i wordmark, exact construction from Judix Logo System.dc.html section 11:
      "Jud" + column-stack (chip on top, stem below) + "x". Bricolage Grotesque 700 with
      letter-spacing -0.03em. All chip/stem proportions are in em so the whole mark scales
      with a single font-size. */
-  .j-brand { font-family: "Bricolage Grotesque", var(--disp); font-weight: 700; font-size: 20px; letter-spacing: -0.03em; color: var(--ink); line-height: 1; display: inline-flex; align-items: flex-end; text-decoration: none; }
+  .j-brand { font-family: "Bricolage Grotesque", var(--disp); font-weight: 700; font-size: 28px; letter-spacing: -0.032em; color: var(--ink); line-height: 1; display: inline-flex; align-items: flex-end; text-decoration: none; }
+  .nav .brand { padding-left: 4px; gap: 14px; }
+  .footer .j-brand { font-size: 24px; }
   .j-brand:hover { color: var(--ink); text-decoration: none; }
   .j-brand .j-idot { display: inline-flex; flex-direction: column; align-items: center; gap: 0.07em; margin: 0 0.05em 0.20em; }
   .j-brand .j-chip { width: 0.16em; height: 0.16em; border-radius: 0.04em; background: var(--silver); }
@@ -129,18 +133,19 @@
       radial-gradient(ellipse 60% 45% at 40% 32%, rgba(44,99,238,.05), transparent 68%),
       radial-gradient(ellipse 40% 32% at 82% 22%, rgba(23,25,34,.035), transparent 62%);
   }
-  .hero-in { position: relative; max-width: 1240px; margin: 0 auto; padding: 88px 32px 96px; display: grid; grid-template-columns: minmax(0,1fr) minmax(420px,520px); gap: 68px; align-items: center; }
-  @media (max-width: 960px) { .hero-in { grid-template-columns: 1fr; gap: 44px; padding: 56px 24px 64px; } }
+  .hero-in { position: relative; max-width: 1240px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: minmax(0,1fr) minmax(440px,540px); gap: 64px; align-items: stretch; }
+  .hero-in > div:first-child { display: flex; flex-direction: column; justify-content: center; }
+  @media (max-width: 960px) { .hero-in { grid-template-columns: 1fr; gap: 44px; padding: 56px 24px 64px; align-items: start; } .hero-in > div:first-child { display: block; } }
   .heron { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; margin-bottom: 22px; }
   .heron .d { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-warm); box-shadow: 0 0 0 4px rgba(226,84,46,.14); animation: jp 1.8s infinite; }
-  /* Hero headline: heading text inherits silver from the h1/h2/h3/h4 rule. The
-     trailing period keeps warm as a single accent point (the brief explicitly says
-     other colors are fine where needed, and this one dot of warm gives the mono-grey
-     headline its only life). */
-  .lead-h1 { font-family: var(--disp); font-size: clamp(40px, 5.4vw, 56px); line-height: 1.02; font-weight: 800; letter-spacing: -0.035em; }
-  .lead-h1 .a { color: inherit; }
-  .lead-h1 .r { color: var(--accent-warm); }
-  .lead-h2 { margin-top: 18px; font-family: var(--disp); font-size: clamp(22px, 2.6vw, 26px); line-height: 1.14; font-weight: 600; letter-spacing: -0.018em; }
+  /* Hero headline: contrast makes the hero, not color. Override the global h1 silver to
+     strong near-black ink so this is the highest-contrast element on the screen. Subtle
+     vertical gradient ink to deep graphite for depth without color. Subline stays calm
+     mid grey. The trailing period keeps warm as the one accent point. */
+  .lead-h1 { font-family: var(--disp); font-size: clamp(48px, 6vw, 68px); line-height: 1.02; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); background: linear-gradient(180deg, #0D0D0F 0%, #2A2A30 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lead-h1 .a { color: inherit; -webkit-text-fill-color: inherit; }
+  .lead-h1 .r { color: var(--accent-warm); -webkit-text-fill-color: var(--accent-warm); background: none; }
+  .lead-h2 { margin-top: 20px; font-family: var(--disp); font-size: clamp(22px, 2.6vw, 26px); line-height: 1.14; font-weight: 600; letter-spacing: -0.018em; color: var(--ink-muted); }
   .lead-h2 .a { color: inherit; }
   .lead-h2 .r { color: var(--accent-warm); }
   .lead-sub { margin-top: 20px; font-size: 16px; line-height: 1.55; color: var(--ink-muted); max-width: 44ch; }
@@ -256,30 +261,33 @@
   .quote-panel .attrib { display: block; margin-top: 12px; font-style: normal; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--on-panel-faint); }
 
   /* where you use it */
-  .where { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 44px; }
+  .where { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 40px; align-items: stretch; }
   @media (max-width: 820px) { .where { grid-template-columns: 1fr; } }
-  .where-col { display: flex; flex-direction: column; gap: 14px; }
+  .where-col { display: flex; flex-direction: column; gap: 12px; }
   .where-col .hd { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--accent-warm); font-weight: 600; }
-  .where-col h3 { font-family: var(--disp); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .where-col h3 { font-family: var(--disp); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; min-height: 2.6em; display: flex; align-items: flex-start; }
   .where-col p.sub { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); }
-  .where-col .panel .body { padding: 18px 18px; font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--on-panel-muted); overflow: auto; }
+  .where-col > .panel, .where-col > .light-panel { flex: 1; display: flex; flex-direction: column; }
+  .where-col .panel .body { padding: 20px 20px; font-family: var(--mono); font-size: 12.5px; line-height: 1.72; color: var(--on-panel-muted); overflow: auto; flex: 1; }
   .where-col .panel .body .cm { color: var(--on-panel-faint); }
   .where-col .panel .body .a { color: var(--accent-2); }
   .where-col .panel .body .s { color: var(--on-panel); }
   .where-col .panel .body .e { color: var(--amber); }
-  .where-col .light-panel { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; padding: 20px 22px; box-shadow: var(--sh-paper); }
-  .where-col .light-panel .row { display: flex; gap: 12px; padding: 10px 0; align-items: baseline; }
+  .where-col .light-panel { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; padding: 22px 24px; box-shadow: var(--sh-paper); }
+  .where-col .light-panel .row { display: flex; gap: 14px; padding: 14px 0; align-items: baseline; flex: 1; }
   .where-col .light-panel .row + .row { border-top: 1px solid var(--hairline-soft); }
-  .where-col .light-panel .row .num { color: var(--accent); font-family: var(--mono); font-size: 11px; font-weight: 600; width: 24px; flex: none; }
+  .where-col .light-panel .row .num { color: var(--accent-warm); font-family: var(--mono); font-size: 11px; font-weight: 600; width: 26px; flex: none; letter-spacing: .06em; }
   .where-col .light-panel .row .txt { font-size: 14px; line-height: 1.5; color: var(--ink); }
   .where-col .light-panel .row .txt b { font-weight: 600; }
-  .where-col .light-panel .cta { margin-top: 16px; }
-  .where-tail { grid-column: 1 / -1; margin-top: 8px; text-align: center; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
+  .where-col .light-panel .cta { margin-top: auto; padding-top: 16px; }
+  .where-tail { grid-column: 1 / -1; margin-top: 16px; text-align: center; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
 
   /* dark cta strip (replaces yellow) */
   .cta-dark { border-top: 1px solid var(--hairline); background: var(--paper-2); }
   .cta-dark-in { max-width: 1240px; margin: 0 auto; padding: 72px 32px; }
-  .cta-panel { border-radius: var(--rp); background: var(--panel); color: var(--on-panel); box-shadow: var(--sh-panel); overflow: hidden; padding: 40px 44px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 44px; align-items: center; position: relative; }
+  .cta-panel { border-radius: var(--rp); background: var(--panel); color: var(--on-panel); box-shadow: var(--sh-panel); overflow: hidden; padding: 40px 44px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 44px; align-items: stretch; position: relative; }
+  .cta-panel > div:first-child { display: flex; flex-direction: column; justify-content: center; }
+  .cta-panel > .side { display: flex; flex-direction: column; gap: 12px; }
   .cta-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.06) 30%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.06) 70%, transparent); }
   @media (max-width: 820px) { .cta-panel { grid-template-columns: 1fr; padding: 30px 26px; gap: 26px; } }
   .cta-panel h2 { color: var(--on-panel); font-family: var(--disp); font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; letter-spacing: -0.025em; margin: 0; }
@@ -521,18 +529,19 @@
   .et-callout { margin: 12px 20px 4px; padding: 12px 15px; border: 1px solid rgba(239,83,80,.32); background: rgba(239,83,80,.08); border-radius: 8px; display: flex; align-items: baseline; gap: 12px; font-size: 13px; line-height: 1.55; color: var(--on-panel); flex-wrap: wrap; }
   .et-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--red); background: rgba(239,83,80,.22); padding: 4px 9px; border-radius: 4px; font-weight: 600; flex: none; }
 
-  /* rag claim breakdown, inside cta-panel */
-  .claim-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
-  .claim-row { display: grid; grid-template-columns: 124px minmax(0,1fr) auto; gap: 12px; padding: 10px 13px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel-2); align-items: center; }
-  @media (max-width: 640px) { .claim-row { grid-template-columns: 1fr; gap: 4px; } }
+  /* rag claim breakdown, inside cta-panel: identical anatomy across all rows,
+     tight grid with no dead center gap. Status color only on the contradicted row. */
+  .claim-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .claim-row { display: grid; grid-template-columns: 108px minmax(0,1fr) 140px; gap: 14px; padding: 11px 14px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel-2); align-items: center; }
+  @media (max-width: 640px) { .claim-row { grid-template-columns: 1fr; gap: 4px; } .claim-row .c-src { text-align: left; } }
   .claim-row.contra { border-color: rgba(239,83,80,.35); background: rgba(239,83,80,.08); }
   .claim-row.sup { border-color: rgba(52,208,138,.20); }
-  .c-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; font-weight: 600; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; text-align: center; }
+  .c-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; font-weight: 600; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; text-align: center; justify-self: start; }
   .claim-row.sup .c-tag { color: var(--green); background: rgba(52,208,138,.16); }
   .claim-row.contra .c-tag { color: var(--red); background: rgba(239,83,80,.20); }
-  .c-text { font-size: 13.5px; color: var(--on-panel); }
+  .c-text { font-size: 13.5px; line-height: 1.4; color: var(--on-panel); }
   .claim-row.contra .c-text { color: var(--red); font-weight: 600; }
-  .c-src { font-family: var(--mono); font-size: 11px; color: var(--on-panel-muted); }
+  .c-src { font-family: var(--mono); font-size: 11px; color: var(--on-panel-muted); text-align: right; }
   .claim-row.contra .c-src { color: var(--red); }
   .cta-summary { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel-3); font-family: var(--mono); font-size: 12px; color: var(--on-panel-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; line-height: 1.4; }
   .cta-summary .k { color: var(--on-panel-faint); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; }
@@ -1846,6 +1855,22 @@ data: {
     } catch (e) {}
   }
   loadLive();
+
+  /* Nav merges into the page at rest; grow a hairline + blur once you scroll past the
+     top. Uses IntersectionObserver on a 1px sentinel so no scroll listener is needed. */
+  (function(){
+    const nav = document.querySelector('#view-landing .nav');
+    if (!nav) return;
+    const sentinel = document.createElement('div');
+    sentinel.setAttribute('aria-hidden', 'true');
+    sentinel.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:1px;pointer-events:none';
+    const host = document.getElementById('view-landing');
+    host.style.position = host.style.position || 'relative';
+    host.prepend(sentinel);
+    new IntersectionObserver(([e]) => {
+      nav.classList.toggle('scrolled', !e.isIntersecting);
+    }, { threshold: 0 }).observe(sentinel);
+  })();
 
   window.addEventListener('hashchange', applyRoute);
   applyRoute();
