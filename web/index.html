@@ -400,6 +400,9 @@
   .verdict { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); padding: 18px 22px; }
   .vtop { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
   .vscore { font-family: var(--mono); font-size: 44px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums slashed-zero; }
+  /* P1.2: the headline waits in a dimmed scoring state until the done event lands */
+  .vwait { font-size: 21px; font-weight: 500; color: var(--ink-faint); letter-spacing: .01em; display: inline-flex; align-items: center; gap: 11px; }
+  .vwait-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent-warm); display: inline-block; animation: jp .9s ease-in-out infinite; }
   .vk { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--ink-faint); margin-top: 6px; }
   .vstats { display: flex; gap: 22px; flex-wrap: wrap; }
   .vstat .vv { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); }
@@ -634,9 +637,9 @@
     <div class="hero-in">
       <div>
         <div class="heron"><span class="d"></span>LIVE, RUST CORE, $0 PER SCORE</div>
-        <h1 class="lead-h1">Real-time evals for <span class="a">agents</span> and <span class="a">RAG</span><span class="r">.</span></h1>
-        <p class="lead-h2">Score every step, <span class="a">while it runs</span><span class="r">.</span></p>
-        <p class="lead-sub"><b>Rust scores every step at zero cost.</b> A model only explains the why.</p>
+        <h1 class="lead-h1">Catch the <span class="a">wrong turn</span> before your user does<span class="r">.</span></h1>
+        <p class="lead-h2">Every agent step and RAG answer, <span class="a">scored while it runs</span><span class="r">.</span></p>
+        <p class="lead-sub"><b>Judix scores in Rust, at zero cost.</b> A model only explains the why.</p>
         <div class="install">
           <div class="install-hd">
             <div class="tabs" role="tablist">
@@ -651,7 +654,7 @@
           <a class="btn-primary" href="#/play"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a>
           <a class="btn-link" href="https://github.com/Anuj7411/judix">Star on GitHub &rarr;</a>
         </div>
-        <div class="hero-tail">MIT, Rust core, $0 per score, model only for the why</div>
+        <div class="hero-tail">Open source. No signup. Try it live.</div>
       </div>
 
       <div class="panel hero-panel" id="heroPanel" aria-label="A real Judix scoring of the wrong_tool demo, replayed on a loop">
@@ -692,7 +695,7 @@
           <div class="lbl">A REAL RUN JUDIX FLAGS IN 4 STEPS</div>
           <p class="quote">The agent was told to book a table for two on Friday, avoiding downtown. It searched <span class="viol">downtown</span> three times, then said "let me try downtown again".</p>
           <div class="verdict-line">
-            <span class="score" id="downtownRun">17</span>
+            <span class="score" id="downtownRun">15</span>
             <span class="tag">/ 100 &middot; RED</span>
             <span class="cap">capped at 59 by a critical fail</span>
           </div>
@@ -760,16 +763,16 @@ loop_free              step 1  <span class="pass">100  pass</span>
                        step 2   <span class="warn">75  fail</span>
                        step 3   <span class="warn">50  fail</span>
 
-step_quality           <span class="fail" id="howSteps">0  33  29  25  0</span>
-run_quality            <span class="fail"><span id="howRun">17.25</span>  red</span>
+step_quality           <span class="fail" id="howSteps">0  33  24  20  0</span>
+run_quality            <span class="fail"><span id="howRun">15.25</span>  red</span>
                        <span class="k">capped at 59, critical fail</span></div>
             <div class="verdict-strip">
-              <span class="k">RUN</span><span class="v">17.25</span>
+              <span class="k">RUN</span><span class="v" id="howRunBig">15.25</span>
               <span class="sp"></span>
-              <span class="cap">deterministic, no network</span>
+              <span class="cap">rust caps it, critical fail</span>
             </div>
           </div>
-          <p class="cap">The verdict. No model was called for any of it.</p>
+          <p class="cap">The wrong tool and the loop are caught in Rust, deterministically. That alone caps the run and makes it red, before any model runs.</p>
         </div>
 
         <div class="how-col">
@@ -795,7 +798,7 @@ run_quality            <span class="fail"><span id="howRun">17.25</span>  red</s
       <div class="panel" style="margin-top:36px">
         <div class="panel-hd">
           <span class="lbl">RUN, <span class="a">WRONG_TOOL</span>, TURN BY TURN</span>
-          <span class="et-final-line">final <span class="score" id="etFinal">17</span> RED</span>
+          <span class="et-final-line">final <span class="score" id="etFinal">15</span> RED</span>
         </div>
         <div class="et-body">
           <div class="et-row">
@@ -810,7 +813,7 @@ run_quality            <span class="fail"><span id="howRun">17.25</span>  red</s
             <span class="et-what"><span class="et-name">search_restaurants</span> <span class="et-kind tool">TOOL_CALL</span></span>
             <span class="et-detail">area:<span class="viol">"downtown"</span>, party_size:2, day:"Friday"</span>
             <span class="et-stepq red"><span class="k">step</span><span class="v">33</span></span>
-            <span class="et-runq red"><span class="k">run</span><span class="v">17</span></span>
+            <span class="et-runq red"><span class="k">run</span><span class="v">15</span></span>
           </div>
           <div class="et-callout">
             <span class="et-tag">CAUGHT AT TURN 2</span>
@@ -835,7 +838,7 @@ run_quality            <span class="fail"><span id="howRun">17.25</span>  red</s
             <span class="et-what"><span class="et-name">reply</span> <span class="et-kind llm">LLM</span></span>
             <span class="et-detail">"Let me try downtown again."</span>
             <span class="et-stepq red"><span class="k">step</span><span class="v">0</span></span>
-            <span class="et-runq red"><span class="k">final</span><span class="v">17</span></span>
+            <span class="et-runq red"><span class="k">final</span><span class="v">15</span></span>
           </div>
         </div>
         <div class="panel-ft">
@@ -850,6 +853,7 @@ run_quality            <span class="fail"><span id="howRun">17.25</span>  red</s
     <div class="band-in">
       <div class="eyebrow"><span class="n">04</span>&thinsp;/&thinsp;WHERE YOU USE IT</div>
       <h2>Two front doors, one engine.</h2>
+      <p class="lead">Wire Judix in once. Every turn and every answer is scored live, automatically. Your users write nothing.</p>
       <div class="where">
         <div class="where-col">
           <div class="hd">IN YOUR APP</div>
@@ -873,7 +877,7 @@ curl -N -X POST <span class="a">/score/rag/stream</span> \
               <div class="api-lbl"><span class="n">b</span>GET BACK</div>
 <pre><span class="cm">event: deterministic</span>
 data: {
-  <span class="k">"run_quality":</span> <span class="viol" id="apiRun">17.25</span>,
+  <span class="k">"run_quality":</span> <span class="viol" id="apiRun">15.25</span>,
   <span class="k">"band":</span> <span class="s">"red"</span>,
   <span class="k">"deterministic_share":</span> <span class="v">0.375</span>,
   <span class="k">"steps":</span> [
@@ -1089,6 +1093,10 @@ data: {
       elm.style.opacity = (0.4 + 0.6 * e).toFixed(3);
       if (p < 1) requestAnimationFrame(frame); else { elm.textContent = fmt(to); elm.style.opacity = '1'; }
     })(performance.now());
+    // Safety net: requestAnimationFrame can be throttled to zero in a backgrounded or
+    // headless tab, which would freeze the counter on its first frame. A timer always
+    // fires, so guarantee the final value is shown regardless.
+    setTimeout(() => { if (elm.dataset.v === String(to)) { elm.textContent = fmt(to); elm.style.opacity = '1'; } }, dur + 160);
   }
 
   /* ============================= HASH ROUTING =============================
@@ -1322,13 +1330,19 @@ data: {
     await grade();
   }
 
+  let gradeSeq = 0;
   async function grade() {
     const r = RUNS[S.runIdx]; if (!S.posted) return;
+    // Sequence token: switching cockpits starts a new grade while an old stream may still
+    // be in flight. Ignore any event from a superseded grade so a stale done never lands
+    // the wrong number on the current cockpit.
+    const seq = ++gradeSeq;
     S.report = null; S.full = false; S.phase = 'scoring'; S.streamed = {}; S.ragMetrics = {}; S.claims = null;
     S.t0 = performance.now(); S.detAt = S.doneAt = null; S.error = null; S.shown = {};
     renderAll();
     const url = r.kind === 'rag' ? '/score/rag/stream' : '/score/agent/stream';
     await sseStream(url, S.posted, (ev, d) => {
+      if (seq !== gradeSeq) return; // a newer grade superseded this stream
       if (ev === 'http') return onHttp(d);
       if (ev === 'neterr') return fail('err', 'Unreachable', d.message);
       if (ev === 'deterministic') { S.report = d; S.detAt = performance.now() - S.t0; defaultSel(); renderAll(); }
@@ -1337,7 +1351,7 @@ data: {
       else if (ev === 'done') { S.report = d; S.full = true; S.phase = 'graded'; S.doneAt = performance.now() - S.t0; cacheRun(); renderAll(); }
       else if (ev === 'error') { if (d.status === 'model_required') model501(d); else fail('err', 'Scoring error', clean(d.message)); }
     });
-    if (S.phase === 'scoring') { S.phase = 'graded'; renderAll(); }
+    if (seq === gradeSeq && S.phase === 'scoring') { S.phase = 'graded'; renderAll(); }
   }
   function cacheRun() {
     const r = RUNS[S.runIdx];
@@ -1589,13 +1603,22 @@ data: {
 
     const action = computeAction(rep, kind);
     const actionTag = action ? '<span class="actiontag" style="color:' + ACTION_CSS[action] + ';border-color:' + ACTION_CSS[action] + '">' + action + '</span>' : '';
+    // P1.2: hold the headline number in a dimmed "scoring" state until the done event.
+    // The deterministic report streams in first (~1ms), but its provisional number would
+    // mislead a glancing judge, so only the final number is shown concrete. Per-step chips
+    // still stream underneath.
+    const showFinal = S.full && score != null;
+    const vnum = showFinal ? String(score) : (scoring ? '<span class="vwait"><i class="vwait-dot"></i>scoring</span>' : '..');
+    const vlabel = showFinal
+      ? ((kind === 'rag' ? 'RAG quality' : 'Run quality') + ' &middot; ' + band + ' ' + actionTag)
+      : (scoring ? 'DETERMINISTIC FIRST, THEN THE MODEL REASON' : (kind === 'rag' ? 'RAG quality' : 'Run quality'));
     let h = '<div class="verdict"><div class="vtop">' +
-      '<div><div class="vscore" id="vscore" data-count="verdict" style="color:' + col + '">' + (score != null ? score : '..') + '</div>' +
-      '<div class="vk">' + (kind === 'rag' ? 'RAG quality' : 'Run quality') + ' &middot; ' + band + ' ' + actionTag + '</div></div>' +
+      '<div><div class="vscore" id="vscore" data-count="verdict" style="color:' + (showFinal ? col : 'var(--ink-faint)') + '">' + vnum + '</div>' +
+      '<div class="vk">' + vlabel + '</div></div>' +
       '<div class="vstats">' +
         '<div class="vstat"><div class="vv" style="color:' + (issues > 0 ? 'var(--red-2)' : 'var(--ink)') + '">' + (issues == null ? '..' : issues) + '</div><div class="vl">' + (issues === 1 ? 'issue found' : 'issues found') + '</div></div>' +
         '<div class="vstat"><div class="vv">' + measured + '</div><div class="vl">grade time</div></div>' +
-        (share ? '<div class="vstat"><div class="vv" style="color:var(--ink)">' + share + '</div><div class="vl">by rust</div></div>' : '') +
+        (share ? '<div class="vstat"><div class="vv" style="color:var(--ink)">' + share + '</div><div class="vl">share by rust</div></div>' : '') +
         '<div class="vstat"><div class="vv">$0' + (rep && rep.model_cost_usd ? ' <span style="color:var(--ink-faint);font-size:11px">list ~$' + rep.model_cost_usd.toFixed(5) + '</span>' : '') + '</div><div class="vl">model cost</div></div>' +
       '</div>' +
       '<div style="flex:1"></div>' +
@@ -1634,12 +1657,12 @@ data: {
     if (kind === 'rag') h += '<div class="mstrip" id="ragmetrics" style="margin-top:16px"></div>';
 
     $('verdict').innerHTML = h;
-    if (score != null) {
+    if (showFinal) {
       const el = $('vscore'); const prev = S.shown.verdict; const from = prev == null ? 0 : prev;
       if (from !== score) countUp(el, score, { from });
       else { el.textContent = String(score); }
       S.shown.verdict = score;
-    }
+    } else { S.shown.verdict = null; }
     if (kind === 'rag') renderRagMetrics();
   }
 
@@ -1831,6 +1854,7 @@ data: {
     setText('etFinal', runInt);
     setText('howSteps', stepScores.join('  '));
     setText('howRun', runFine);
+    setText('howRunBig', runFine);
     setText('apiRun', runFine);
     if (stepScores[1] != null) setText('apiStep', stepScores[1]);
 
@@ -1909,6 +1933,12 @@ data: {
       const fx = await (await fetch('/demo/rag_hallucination')).json();
       const res = await fetch('/score/rag', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fx) });
       if (res.ok) paintRag(await res.json(), fx);
+    } catch (e) {}
+    // P1.2: pre-warm the clean demo too, so all three playground runs land instantly
+    // from the server-side model cache when a judge opens a cockpit.
+    try {
+      const fx = await (await fetch('/demo/clean')).json();
+      await fetch('/score/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fx) });
     } catch (e) {}
   }
   loadLive();
