@@ -72,6 +72,7 @@
   }
   *,*::before,*::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  html, body { overflow-x: hidden; max-width: 100%; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
     font-family: var(--body); font-size: 15px; line-height: 1.5;
@@ -92,7 +93,7 @@
   /* Nav merged into the page: transparent at rest, thin hairline + blur on scroll only. */
   .nav { border-bottom: 1px solid transparent; background: transparent; position: sticky; top: 0; z-index: 50; transition: background .18s var(--ease-out), border-color .18s var(--ease-out); }
   .nav.scrolled { background: rgba(255,255,255,.82); backdrop-filter: blur(10px); border-bottom-color: var(--hairline); }
-  .nav-in { max-width: 1240px; margin: 0 auto; padding: 0 40px; height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .nav-in { max-width: 1200px; margin: 0 auto; padding: 0 40px; height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   @media (max-width: 640px) { .nav-in { padding: 0 20px; height: 60px; } }
   .brand { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
   .brand .mark { display: flex; align-items: center; gap: 9px; }
@@ -100,7 +101,7 @@
      "Jud" + column-stack (chip on top, stem below) + "x". Bricolage Grotesque 700 with
      letter-spacing -0.03em. All chip/stem proportions are in em so the whole mark scales
      with a single font-size. */
-  .j-brand { font-family: "Bricolage Grotesque", var(--disp); font-weight: 700; font-size: 28px; letter-spacing: -0.032em; color: var(--ink); line-height: 1; display: inline-flex; align-items: flex-end; text-decoration: none; }
+  .j-brand { font-family: "Bricolage Grotesque", var(--disp); font-weight: 700; font-size: 36px; letter-spacing: -0.032em; color: var(--ink); line-height: 1; display: inline-flex; align-items: flex-end; text-decoration: none; }
   .nav .brand { padding-left: 4px; gap: 14px; }
   .footer .j-brand { font-size: 24px; }
   .j-brand:hover { color: var(--ink); text-decoration: none; }
@@ -133,7 +134,7 @@
       radial-gradient(ellipse 60% 45% at 40% 32%, rgba(44,99,238,.05), transparent 68%),
       radial-gradient(ellipse 40% 32% at 82% 22%, rgba(23,25,34,.035), transparent 62%);
   }
-  .hero-in { position: relative; max-width: 1240px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: minmax(0,1fr) minmax(440px,540px); gap: 64px; align-items: stretch; }
+  .hero-in { position: relative; max-width: 1200px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: minmax(0,1fr) minmax(440px,540px); gap: 64px; align-items: stretch; }
   .hero-in > div:first-child { display: flex; flex-direction: column; justify-content: center; }
   @media (max-width: 960px) { .hero-in { grid-template-columns: 1fr; gap: 44px; padding: 56px 24px 64px; align-items: start; } .hero-in > div:first-child { display: block; } }
   .heron { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; margin-bottom: 22px; }
@@ -159,7 +160,7 @@
   .copyb { font-family: var(--mono); font-size: 11px; padding: 5px 12px; border: 1px solid var(--hairline); border-radius: 6px; background: transparent; color: var(--ink-muted); cursor: pointer; transition: color .12s var(--ease-out), border-color .12s var(--ease-out); }
   .copyb:hover { color: var(--accent); border-color: var(--accent-bd); }
   .copyb.ok { color: var(--green-2); border-color: color-mix(in oklab, var(--green) 40%, var(--hairline)); }
-  .install-cmd { padding: 14px 16px; font-family: var(--mono); font-size: 13px; color: var(--ink); overflow-x: auto; white-space: nowrap; }
+  .install-cmd { padding: 14px 16px; font-family: var(--mono); font-size: 13px; color: var(--ink); white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
   .install-cmd .p { color: var(--accent); }
 
   .hero-ctas { margin-top: 30px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
@@ -210,7 +211,7 @@
   /* ==================== SECTION BAND ==================== */
   .band { border-top: 1px solid var(--hairline); background: var(--paper); }
   .band.alt { background: var(--paper-2); }
-  .band-in { max-width: 1240px; margin: 0 auto; padding: 88px 32px; }
+  .band-in { max-width: 1200px; margin: 0 auto; padding: 88px 32px; }
   @media (max-width: 960px) { .band-in { padding: 56px 24px; } }
   .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; display: inline-flex; align-items: center; gap: 9px; }
   .eyebrow .n { color: var(--ink-faint); }
@@ -218,8 +219,9 @@
   .band .lead { margin: 18px 0 0; font-size: 16px; line-height: 1.6; color: var(--ink-muted); max-width: 52ch; }
 
   /* problem */
-  .problem { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
-  @media (max-width: 900px) { .problem { grid-template-columns: 1fr; gap: 40px; } }
+  .problem { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: stretch; }
+  .problem > div:last-child { display: flex; flex-direction: column; justify-content: center; }
+  @media (max-width: 900px) { .problem { grid-template-columns: 1fr; gap: 40px; } .problem > div:last-child { justify-content: flex-start; } }
   .stats-list { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
   .stat-row { display: flex; align-items: baseline; gap: 24px; border-top: 1px solid var(--hairline); padding: 22px 0; }
   .stat-row:last-child { border-bottom: 1px solid var(--hairline); }
@@ -284,7 +286,7 @@
 
   /* dark cta strip (replaces yellow) */
   .cta-dark { border-top: 1px solid var(--hairline); background: var(--paper-2); }
-  .cta-dark-in { max-width: 1240px; margin: 0 auto; padding: 72px 32px; }
+  .cta-dark-in { max-width: 1200px; margin: 0 auto; padding: 72px 32px; }
   .cta-panel { border-radius: var(--rp); background: var(--panel); color: var(--on-panel); box-shadow: var(--sh-panel); overflow: hidden; padding: 40px 44px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 44px; align-items: stretch; position: relative; }
   .cta-panel > div:first-child { display: flex; flex-direction: column; justify-content: center; }
   .cta-panel > .side { display: flex; flex-direction: column; gap: 12px; }
@@ -322,7 +324,7 @@
 
   /* footer */
   .footer { background: var(--ink); }
-  .footer-in { max-width: 1240px; margin: 0 auto; padding: 40px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .footer-in { max-width: 1200px; margin: 0 auto; padding: 40px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .footer .brand .jword { color: #fff; font-size: 16px; }
   .footer .tagline { font-size: 13px; color: #8D93A0; }
   .footer .links { display: flex; gap: 24px; font-family: var(--mono); font-size: 12px; flex-wrap: wrap; }
@@ -332,13 +334,13 @@
 
   /* ==================== PLAYGROUND ==================== */
   .pg-top { border-bottom: 1px solid var(--hairline); background: rgba(246,247,250,.86); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 50; }
-  .pg-top-in { max-width: 1280px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .pg-top-in { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .pg-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
   .pg-back { display: flex; align-items: center; gap: 8px; color: var(--ink-muted); font-size: 13.5px; font-weight: 500; }
   .pg-back:hover { color: var(--ink); text-decoration: none; }
   .pg-sep { width: 1px; height: 15px; background: var(--hairline); }
   .pg-crumb { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: var(--ink); }
-  .pg-wrap { max-width: 1280px; margin: 0 auto; padding: 26px 24px 48px; }
+  .pg-wrap { max-width: 1200px; margin: 0 auto; padding: 26px 24px 48px; }
   .pg-lede { margin-bottom: 18px; }
   .pg-eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; color: var(--accent-warm); font-weight: 600; }
   .pg-lede h1 { font-family: var(--disp); font-size: 27px; font-weight: 700; letter-spacing: -0.022em; margin-top: 8px; }
@@ -347,6 +349,20 @@
   .grid { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 18px; align-items: start; }
   @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
   .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  /* P0.2/P0.3: the cockpit is a dimmed 260px rail beside a roomy main area (Linear pattern) */
+  .cockpit { grid-template-columns: 260px minmax(0,1fr); gap: 30px; }
+  .cockpit .main { gap: 24px; }
+  .cockpit .rail { position: sticky; top: 76px; opacity: .9; transition: opacity .18s var(--ease-out); }
+  .cockpit .rail:hover, .cockpit .rail:focus-within { opacity: 1; }
+  .rail-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 12px; padding: 10px 12px; font-family: var(--body); font-size: 12.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1px solid var(--hairline); border-radius: 9px; cursor: pointer; box-shadow: var(--sh-paper); transition: border-color .14s var(--ease-out); }
+  .rail-btn:hover { border-color: var(--accent-bd); }
+  .rail-btn i { font-size: 15px; }
+  .rail-link { display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 7px 2px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-muted); text-decoration: none; cursor: pointer; }
+  .rail-link:hover { color: var(--ink); }
+  .rail-link i { font-size: 14px; }
+  #pasteWrap { margin-top: 12px; }
+  #pasteWrap .sec-lbl { margin-bottom: 7px; }
+  @media (max-width: 820px) { .cockpit { grid-template-columns: 1fr; } .cockpit .rail { position: static; opacity: 1; } }
   .sec-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--ink-faint); margin: 0 2px 9px; }
 
   .run { width: 100%; text-align: left; border: 1px solid var(--hairline); background: #fff; border-radius: 10px; padding: 12px 14px; cursor: pointer; box-shadow: var(--sh-paper); transition: border-color .15s var(--ease-out), transform .18s var(--ease-out), box-shadow .18s var(--ease-out); display: block; margin-bottom: 8px; }
@@ -494,6 +510,19 @@
   .choose-card[data-choose="agent"] .ct i { color: var(--red-2); }
   .choose-card[data-choose="rag"] .ct i { color: var(--amber-2); }
   .choose-card .cd { margin-top: 5px; font-size: 12.5px; color: var(--ink-muted); line-height: 1.45; text-wrap: pretty; }
+  /* P0.1: the chooser is its own routed page (#/play), calm and centered */
+  #play-chooser { max-width: 900px; margin: 0 auto; min-height: calc(100vh - 56px - 74px); display: flex; flex-direction: column; justify-content: center; }
+  #play-chooser .pg-lede { text-align: center; margin-bottom: 8px; }
+  #play-chooser .pg-lede h1 { max-width: 20ch; margin-left: auto; margin-right: auto; }
+  #play-chooser .pg-lede p { margin-left: auto; margin-right: auto; }
+  #play-chooser .chooser { margin-top: 22px; background: transparent; border: none; box-shadow: none; padding: 0; gap: 16px; }
+  #play-chooser .choose-card { padding: 22px 22px 18px; min-height: 158px; display: flex; flex-direction: column; box-shadow: var(--sh-paper); }
+  .choose-card .cgo { margin-top: auto; padding-top: 16px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--accent-warm); display: flex; align-items: center; gap: 6px; opacity: .8; transition: gap .16s var(--ease-out), opacity .16s var(--ease-out); }
+  .choose-card:hover .cgo { opacity: 1; gap: 9px; }
+  /* P0.1: back control on each cockpit page */
+  .cockpit-back { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; color: var(--ink-muted); text-decoration: none; margin-bottom: 18px; transition: color .12s var(--ease-out); }
+  .cockpit-back:hover { color: var(--ink); }
+  .cockpit-back i { font-size: 13px; }
 
   .notice { border: 1px solid; border-radius: var(--rp); padding: 16px 18px; font-size: 13.5px; line-height: 1.55; text-wrap: pretty; }
   .notice.info { border-color: var(--hairline); background: #fff; color: var(--ink-muted); }
@@ -594,7 +623,7 @@
         <a class="navlink" href="#how">How it works</a>
         <a class="navlink" href="#where">Where you use it</a>
         <a class="navlink" href="#compare">Compare</a>
-        <a class="navlink" href="#playground">Playground</a>
+        <a class="navlink" href="#/play">Playground</a>
         <a class="gh" href="https://github.com/Anuj7411/judix"><span class="star">&#9733;</span>Star on GitHub</a>
       </nav>
     </div>
@@ -619,7 +648,7 @@
           <div class="install-cmd"><span class="p">$ </span><span id="instCmd">cargo install --git https://github.com/Anuj7411/judix judix-cli</span></div>
         </div>
         <div class="hero-ctas">
-          <a class="btn-primary" href="#playground"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a>
+          <a class="btn-primary" href="#/play"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a>
           <a class="btn-link" href="https://github.com/Anuj7411/judix">Star on GitHub &rarr;</a>
         </div>
         <div class="hero-tail">MIT, Rust core, $0 per score, model only for the why</div>
@@ -878,7 +907,7 @@ data: {
             <div class="row"><span class="num">02</span><span class="txt">Rust paints the deterministic report in ~1ms. Watch it land first.</span></div>
             <div class="row"><span class="num">03</span><span class="txt">Model narration streams in, per step, in completion order.</span></div>
             <div class="row"><span class="num">04</span><span class="txt">Click any step to inspect its call, its metrics, and the reason.</span></div>
-            <div class="cta"><a class="btn-primary" href="#playground"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a></div>
+            <div class="cta"><a class="btn-primary" href="#/play"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a></div>
           </div>
         </div>
         <div class="where-tail">Same engine, two front doors. No key needed for agent scoring.</div>
@@ -893,7 +922,7 @@ data: {
           <h2>See every claim, grounded or contradicted.</h2>
           <p>Judix decomposes a RAG answer into atomic claims and grounds each one against the retrieved sources. Averages would hide the one bad claim. Judix caps the score when any claim contradicts the source.</p>
           <div class="cta-actions">
-            <a class="grade" href="#playground"><i class="ph ph-play-circle" style="font-size:18px"></i>Grade the RAG demo</a>
+            <a class="grade" href="#/play/rag"><i class="ph ph-play-circle" style="font-size:18px"></i>Grade the RAG demo</a>
             <a class="btn-ghost" href="https://github.com/Anuj7411/judix">Read the spec &rarr;</a>
           </div>
         </div>
@@ -972,9 +1001,10 @@ data: {
   </header>
 
   <div class="pg-wrap">
+    <div id="play-chooser">
     <div class="pg-lede">
       <div class="pg-eyebrow">WHAT DO YOU WANT TO EVALUATE?</div>
-      <h1>Watch Judix grade an AI system live, one turn at a time.</h1>
+      <h1>Watch Judix grade an AI system live, one turn at a time, before your user ever sees the mistake.</h1>
       <p>Pick a side. A live example runs and is scored as it streams, deterministic verdict first, model reason after. Click any turn or claim to see the evidence.</p>
     </div>
 
@@ -982,19 +1012,34 @@ data: {
       <button class="choose-card" data-choose="agent" aria-selected="true">
         <div class="ct"><i class="ph ph-robot"></i>Score an AI agent</div>
         <div class="cd">Catch the wrong tool, the loop, and the drift as the agent runs, before the reply is sent.</div>
+        <div class="cgo">Open the agent cockpit <i class="ph ph-arrow-right"></i></div>
       </button>
       <button class="choose-card" data-choose="rag" aria-selected="false">
         <div class="ct"><i class="ph ph-quotes"></i>Score a RAG answer</div>
         <div class="cd">Catch the hallucination, claim by claim, against the sources, before the user reads it.</div>
+        <div class="cgo">Open the RAG cockpit <i class="ph ph-arrow-right"></i></div>
       </button>
     </div>
+    </div><!-- /play-chooser -->
 
-    <div class="grid">
-      <div class="col">
-        <div>
-          <div class="sec-lbl">RUNS</div>
-          <div id="runs"></div>
+    <div id="play-cockpit" style="display:none">
+    <a class="cockpit-back" href="#/play"><i class="ph ph-arrow-left"></i>Choose what to evaluate</a>
+
+    <div class="grid cockpit">
+      <aside class="col rail">
+        <div class="sec-lbl">RUNS</div>
+        <div id="runs"></div>
+        <button class="rail-btn" id="scoreOwnBtn" type="button"><i class="ph ph-code"></i>Score your own</button>
+        <a class="rail-link" id="savedLink" href="javascript:void(0)"><i class="ph ph-bookmark-simple"></i>Saved tests</a>
+        <div class="paste" id="pasteWrap" hidden>
+          <div class="sec-lbl">PASTE A TRACE OR A RAG TRIPLE</div>
+          <textarea id="input" spellcheck="false" placeholder='Agent trace {"goal":"...","steps":[...],"expected_tools":[...]} or RAG {"question":"...","contexts":[...],"answer":"..."}'></textarea>
+          <div class="go"><button class="btn-paste" id="pasteBtn">Score pasted JSON</button></div>
         </div>
+        <div class="hint">Deterministic scoring runs at $0 with no key. Set a model key to add the model narration.</div>
+      </aside>
+      <main class="col main">
+        <div id="verdict"></div>
         <div class="card">
           <div class="tree-h">
             <span class="t" id="tree-label">TRACE</span>
@@ -1002,20 +1047,12 @@ data: {
           </div>
           <div class="tree-b" id="tree"></div>
         </div>
-        <div class="paste">
-          <div class="sec-lbl">SCORE YOUR OWN</div>
-          <textarea id="input" spellcheck="false" placeholder='Paste an agent trace {"goal":"...","steps":[...],"expected_tools":[...]} or a RAG triple {"question":"...","contexts":[...],"answer":"..."}'></textarea>
-          <div class="go"><button class="btn-paste" id="pasteBtn">Score pasted JSON</button></div>
-        </div>
-        <div class="hint">Deterministic scoring runs at $0 with no key. Set a model key to add the model narration.</div>
-      </div>
-      <div class="col">
-        <div id="verdict"></div>
         <div id="detail"></div>
         <div class="foot" id="foot"></div>
         <div class="flywheel-card" id="flywheel"></div>
-      </div>
+      </main>
     </div>
+    </div><!-- /play-cockpit -->
   </div>
 </div>
 
@@ -1054,14 +1091,26 @@ data: {
     })(performance.now());
   }
 
-  /* ============================= HASH ROUTING ============================= */
-  let playgroundInited = false;
+  /* ============================= HASH ROUTING =============================
+     Three routed playground pages inside the one file:
+       #/play         the chooser only (calm, centered, nothing else)
+       #/play/agent   the agent cockpit only
+       #/play/rag     the RAG cockpit only
+     The chooser and a cockpit are NEVER shown stacked. */
+  let playgroundKind = null;
+  function currentKind() { return location.hash === '#/play/rag' ? 'rag' : 'agent'; }
   function applyRoute() {
-    const isPg = location.hash === '#playground';
-    $('view-landing').style.display = isPg ? 'none' : '';
-    $('view-playground').style.display = isPg ? '' : 'none';
-    if (isPg && !playgroundInited) { playgroundInited = true; selectRun(1); }
-    if (isPg) window.scrollTo(0, 0);
+    const h = location.hash;
+    if (h === '#playground' || h === '#/playground') { location.hash = '#/play'; return; }
+    const onPlay = h === '#/play' || h.indexOf('#/play/') === 0;
+    $('view-landing').style.display = onPlay ? 'none' : '';
+    $('view-playground').style.display = onPlay ? '' : 'none';
+    if (!onPlay) return;
+    const kind = h === '#/play/agent' ? 'agent' : h === '#/play/rag' ? 'rag' : null;
+    $('play-chooser').style.display = kind ? 'none' : '';
+    $('play-cockpit').style.display = kind ? '' : 'none';
+    if (kind && playgroundKind !== kind) { playgroundKind = kind; selectRun(kind === 'rag' ? 2 : 1); }
+    window.scrollTo(0, 0);
   }
 
   /* ============================= LANDING: install ============================= */
@@ -1248,8 +1297,7 @@ data: {
   const hasModel = () => _hasModel === true;
 
   function chooseKind(k) {
-    document.querySelectorAll('#chooser .choose-card').forEach(c => c.setAttribute('aria-selected', String(c.getAttribute('data-choose') === k)));
-    selectRun(k === 'rag' ? 2 : 1);
+    location.hash = k === 'rag' ? '#/play/rag' : '#/play/agent';
   }
   function syncChooser() {
     const k = RUNS[S.runIdx] ? RUNS[S.runIdx].kind : 'agent';
@@ -1338,7 +1386,8 @@ data: {
   function scoreOf(r) { if (!r) return null; return r.rag_quality != null ? r.rag_quality : r.run_quality; }
 
   function renderRuns() {
-    $('runs').innerHTML = RUNS.map((r, i) => {
+    const kind = currentKind();
+    $('runs').innerHTML = RUNS.map((r, i) => ({ r, i })).filter(x => x.r.kind === kind).map(({ r, i }) => {
       const c = S.cache[r.id];
       const isCur = i === S.runIdx;
       const graded = isCur ? (S.full && S.report) : (c && c.full);
@@ -1747,6 +1796,14 @@ data: {
     S.posted = data; S.error = null;
     grade();
   });
+
+  // P0.2: the "Score your own" rail button reveals the paste box; Saved tests jumps to the flywheel
+  $('scoreOwnBtn').addEventListener('click', () => {
+    const p = $('pasteWrap'); p.hidden = !p.hidden;
+    $('scoreOwnBtn').setAttribute('aria-expanded', String(!p.hidden));
+    if (!p.hidden) { $('input').focus(); p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  });
+  $('savedLink').addEventListener('click', () => { const f = $('flywheel'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
   fetch('/health').then(r => r.json()).then(j => { _hasModel = !!(j.model_layer && String(j.model_layer).indexOf('disabled') < 0); }).catch(() => {});
 
