@@ -134,7 +134,7 @@
       radial-gradient(ellipse 60% 45% at 40% 32%, rgba(44,99,238,.05), transparent 68%),
       radial-gradient(ellipse 40% 32% at 82% 22%, rgba(23,25,34,.035), transparent 62%);
   }
-  .hero-in { position: relative; max-width: 1200px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: minmax(0,1fr) minmax(440px,540px); gap: 64px; align-items: stretch; }
+  .hero-in { position: relative; max-width: 1200px; margin: 0 auto; padding: 48px 40px 56px; display: grid; grid-template-columns: minmax(0,1fr) minmax(400px,500px); gap: 48px; align-items: stretch; }
   .hero-in > div:first-child { display: flex; flex-direction: column; justify-content: center; }
   @media (max-width: 960px) { .hero-in { grid-template-columns: 1fr; gap: 44px; padding: 56px 24px 64px; align-items: start; } .hero-in > div:first-child { display: block; } }
   .heron { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; margin-bottom: 22px; }
@@ -143,13 +143,13 @@
      strong near-black ink so this is the highest-contrast element on the screen. Subtle
      vertical gradient ink to deep graphite for depth without color. Subline stays calm
      mid grey. The trailing period keeps warm as the one accent point. */
-  .lead-h1 { font-family: var(--disp); font-size: clamp(48px, 6vw, 68px); line-height: 1.02; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); background: linear-gradient(180deg, #0D0D0F 0%, #2A2A30 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lead-h1 { font-family: var(--disp); font-size: clamp(32px, 4.4vw, 50px); line-height: 1.04; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); background: linear-gradient(180deg, #0D0D0F 0%, #2A2A30 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
   .lead-h1 .a { color: inherit; -webkit-text-fill-color: inherit; }
   .lead-h1 .r { color: var(--accent-warm); -webkit-text-fill-color: var(--accent-warm); background: none; }
-  .lead-h2 { margin-top: 20px; font-family: var(--disp); font-size: clamp(22px, 2.6vw, 26px); line-height: 1.14; font-weight: 600; letter-spacing: -0.018em; color: var(--ink-muted); }
+  .lead-h2 { margin-top: 14px; font-family: var(--disp); font-size: clamp(16px, 1.9vw, 20px); line-height: 1.2; font-weight: 600; letter-spacing: -0.018em; color: var(--ink-muted); }
   .lead-h2 .a { color: inherit; }
   .lead-h2 .r { color: var(--accent-warm); }
-  .lead-sub { margin-top: 20px; font-size: 16px; line-height: 1.55; color: var(--ink-muted); max-width: 44ch; }
+  .lead-sub { margin-top: 16px; font-size: 14.5px; line-height: 1.55; color: var(--ink-muted); max-width: 44ch; }
   .lead-sub b { color: var(--ink); font-weight: 600; }
 
   .install { margin-top: 32px; border: 1px solid var(--hairline); border-radius: 10px; background: #fff; max-width: 520px; box-shadow: var(--sh-paper); }
@@ -185,7 +185,7 @@
 
   /* hero panel */
   .hero-panel .top { padding: 20px 20px 8px; display: flex; align-items: flex-end; gap: 30px; flex-wrap: wrap; }
-  .hero-panel .score { font-family: var(--mono); font-size: 48px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums slashed-zero; transition: color .3s var(--ease-out); }
+  .hero-panel .score { font-family: var(--mono); font-size: 40px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums slashed-zero; transition: color .3s var(--ease-out); }
   .hero-panel .k { margin-top: 8px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--on-panel-faint); }
   .hero-panel .stats { display: flex; gap: 26px; padding-bottom: 4px; flex-wrap: wrap; }
   .hero-panel .stat .v { font-family: var(--mono); font-size: 17px; color: var(--on-panel); font-variant-numeric: tabular-nums slashed-zero; }
@@ -211,11 +211,11 @@
   /* ==================== SECTION BAND ==================== */
   .band { border-top: 1px solid var(--hairline); background: var(--paper); }
   .band.alt { background: var(--paper-2); }
-  .band-in { max-width: 1200px; margin: 0 auto; padding: 88px 32px; }
+  .band-in { max-width: 1200px; margin: 0 auto; padding: 60px 32px; }
   @media (max-width: 960px) { .band-in { padding: 56px 24px; } }
   .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; display: inline-flex; align-items: center; gap: 9px; }
   .eyebrow .n { color: var(--ink-faint); }
-  .band h2 { margin: 16px 0 0; font-family: var(--disp); font-size: clamp(30px, 4.2vw, 44px); line-height: 1.05; font-weight: 700; letter-spacing: -0.028em; }
+  .band h2 { margin: 16px 0 0; font-family: var(--disp); font-size: clamp(24px, 3vw, 34px); line-height: 1.08; font-weight: 700; letter-spacing: -0.028em; }
   .band .lead { margin: 18px 0 0; font-size: 16px; line-height: 1.6; color: var(--ink-muted); max-width: 52ch; }
 
   /* problem */
@@ -243,7 +243,7 @@
   .how-col { display: flex; flex-direction: column; gap: 12px; }
   .how-col .step-lbl { display: flex; align-items: baseline; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-faint); }
   .how-col .step-lbl .n { color: var(--accent-warm); font-weight: 600; }
-  .how-col h3 { font-family: var(--disp); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .how-col h3 { font-family: var(--disp); font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
   .how-col p.cap { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-muted); }
   .how-col .panel { flex: 1; display: flex; flex-direction: column; min-height: 190px; }
   .how-col .panel .body { padding: 16px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: var(--on-panel-muted); flex: 1; overflow: auto; }
@@ -267,7 +267,7 @@
   @media (max-width: 820px) { .where { grid-template-columns: 1fr; } }
   .where-col { display: flex; flex-direction: column; gap: 12px; }
   .where-col .hd { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--accent-warm); font-weight: 600; }
-  .where-col h3 { font-family: var(--disp); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; min-height: 2.6em; display: flex; align-items: flex-start; }
+  .where-col h3 { font-family: var(--disp); font-size: 19px; font-weight: 700; letter-spacing: -0.02em; min-height: 2.6em; display: flex; align-items: flex-start; }
   .where-col p.sub { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); }
   .where-col > .panel, .where-col > .light-panel { flex: 1; display: flex; flex-direction: column; }
   .where-col .panel .body { padding: 20px 20px; font-family: var(--mono); font-size: 12.5px; line-height: 1.72; color: var(--on-panel-muted); overflow: auto; flex: 1; }
@@ -286,13 +286,13 @@
 
   /* dark cta strip (replaces yellow) */
   .cta-dark { border-top: 1px solid var(--hairline); background: var(--paper-2); }
-  .cta-dark-in { max-width: 1200px; margin: 0 auto; padding: 72px 32px; }
+  .cta-dark-in { max-width: 1200px; margin: 0 auto; padding: 56px 32px; }
   .cta-panel { border-radius: var(--rp); background: var(--panel); color: var(--on-panel); box-shadow: var(--sh-panel); overflow: hidden; padding: 40px 44px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 44px; align-items: stretch; position: relative; }
   .cta-panel > div:first-child { display: flex; flex-direction: column; justify-content: center; }
   .cta-panel > .side { display: flex; flex-direction: column; gap: 12px; }
   .cta-panel::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.06) 30%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.06) 70%, transparent); }
   @media (max-width: 820px) { .cta-panel { grid-template-columns: 1fr; padding: 30px 26px; gap: 26px; } }
-  .cta-panel h2 { color: var(--on-panel); font-family: var(--disp); font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; letter-spacing: -0.025em; margin: 0; }
+  .cta-panel h2 { color: var(--on-panel); font-family: var(--disp); font-size: clamp(23px, 2.7vw, 31px); font-weight: 800; letter-spacing: -0.025em; margin: 0; }
   .cta-panel p { margin: 14px 0 0; font-size: 15px; line-height: 1.6; color: var(--on-panel-muted); max-width: 44ch; }
   .cta-panel .side { display: flex; flex-direction: column; gap: 16px; }
   .cta-answer { font-family: var(--body); font-size: 15px; line-height: 1.7; color: var(--on-panel); padding: 14px 16px; border: 1px solid var(--panel-line); border-radius: 10px; background: var(--panel-2); }
