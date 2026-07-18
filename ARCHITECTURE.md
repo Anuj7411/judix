@@ -52,6 +52,174 @@ instrument**, not a SaaS landing page.
 
 ---
 
+## 1.5 Direction from here: live automatic per-turn evaluation and the Eval Flywheel
+
+> Recorded from `JUDIX_update_spec.md`. This is the direction Judix takes from this
+> hackathon build forward. The deterministic Rust engine, its scoring, its caps, and its
+> numbers stay exactly as documented in sections 3 and 4. Everything below is added around
+> that frozen core. House style for this section: no em dashes.
+
+### 1.5.1 What changes, in one paragraph
+
+Judix stops presenting hand-written JSON as the way to use it. The real product is live and
+automatic: a developer wires Judix into their agent or RAG app one time, with a single hook,
+and from then on every turn and every answer is scored live, per turn, automatically, with
+no JSON and no manual work for anyone. The end user does nothing. On top of that, Judix
+gains one standout feature, the **Eval Flywheel**, which turns every failure it catches in
+production into a reusable regression test, so the offline eval suite writes itself. The
+manual paste option stays, but only as an optional path for people who want it, never as
+the main story.
+
+### 1.5.2 Honest positioning (so the copy stays true)
+
+- Judix scores whether an agent step or a RAG answer was actually right, live, per turn.
+- The core scorer is a deterministic Rust engine, not a model and not a trained classifier.
+  Exact, reproducible, zero cost, and explainable to the arithmetic. A model is used only
+  to narrate the why, and only for the subjective checks.
+- Real-time per-turn classifiers now exist elsewhere (Galileo Luna-2, Morph Reflex). Judix
+  is **the deterministic, open-source, zero-cost take**. The structural failures (wrong
+  tool, loop, contradiction) are caught by exact computation, not guessed by a paid model.
+  Do not claim to be the only one doing per-turn. Claim to be the deterministic and free
+  one.
+
+### 1.5.3 The two front doors
+
+Judix has two ways in, and each scores two things (agents and RAG).
+
+**Front door A: the Playground** (try it, in the browser). Reorganized as a clear flow, not
+a single dense screen.
+
+1. **Entry chooser.** A short, engaging screen asking "What do you want to evaluate?" with
+   two clear choices: *Score an AI agent* and *Score a RAG answer*. First thing a judge
+   sees after opening the playground, so it has to orient in five seconds.
+2. **Agent section.** On one side, a live example that runs and is scored turn by turn in
+   front of the viewer. On the other side, a clearly visible *Score your own agent* option
+   plus a short three-step how-to. The manual paste path lives here, secondary.
+3. **RAG section.** A live example of a RAG answer being checked claim by claim against its
+   sources, the contradicting claim flagged in place. A clearly visible *Score your own RAG
+   answer* option and the same short how-to. Manual paste path here too, secondary.
+
+**Front door B: the API and Service page** (use it in your app). A short docs-style page
+that shows how a developer wires Judix into their own app so it runs live and automatically
+in production. Covers the one-time hook, the request and response, and the action Judix
+returns.
+
+### 1.5.4 How live automatic scoring works (the hook)
+
+Heart of the change. Follows the inline guardrail pattern that Galileo and Morph use,
+because it is the credible, recognized approach.
+
+- The developer adds one hook, one time: an inline call at the point where a step
+  completes or an answer is produced, or a thin callback that does it for them. Configured
+  by env vars for the API key and an optional self-hosted URL, exactly like the incumbents.
+- After that, every turn and every answer is sent to Judix automatically. No JSON authored
+  by a human. The hook produces the data under the hood.
+- Judix returns fast. The deterministic verdict is ready in about a millisecond, so the app
+  can act on it inline, before the reply is sent. The model narration streams in afterward
+  and never blocks.
+- Judix returns an **`action`** field, following the guardrail pattern: **`pass`**,
+  **`flag`**, or **`block`**, derived from the score and the hard caps. This lets the app
+  actually stop a bad turn, not just log it. The `block` decision fires on the
+  deterministic verdict, which is the speed advantage made real.
+
+**Agent side.** After each step, the hook sends the trace so far. Judix scores tool-call
+correctness, loop, relevance, and drift, and returns the action. If run quality drops or a
+critical cap fires, the app can stop the run before the reply is sent.
+
+**RAG side.** When an answer is produced, the hook sends the question, the retrieved
+sources, and the answer. Judix decomposes the answer into claims, grounds each against the
+sources, flags any that contradict, caps the score, and returns the action. A hallucination
+can be blocked or corrected before the user reads it.
+
+**Framing.** The one-time hook is the commodity part that every tool has. What Judix does
+once the data arrives (deterministic exact scoring at zero cost with severity caps) is the
+part to show first.
+
+### 1.5.5 The Eval Flywheel (the standout feature)
+
+Because Judix scores every turn live, it already knows exactly which turns failed. The
+flywheel turns that into value automatically.
+
+- When Judix catches a failure live, it can save that exact case as a regression test: the
+  agent run with its goal, steps, and expected tools, or the RAG answer with its question,
+  sources, and the contradicting claim, along with the verdict as the baseline.
+- Saved cases collect into a test suite that grows on its own from real production
+  failures, instead of being hand-written and going stale.
+- **Rerun any time.** Replaying a saved case through the deterministic engine confirms
+  whether a fix still holds, so a change that reintroduces an old failure is caught before
+  it ships.
+- **Export as JSON** so it can run in CI. That is the bridge from Judix's live world to
+  the offline suite everyone else lives in.
+
+**One-line value.** Everyone else's eval suite goes stale because a human has to write the
+tests. Judix watches production live, and every failure it catches becomes a regression
+test automatically. The eval suite writes itself, for both agents and RAG.
+
+**Honesty note for the docs.** Adding a trace to a dataset exists in other tools as a
+manual flow. What is fresh here is that it is automatic, driven by deterministic live
+per-turn scoring, covers both agents and RAG, and is open source and free. Frame it that
+way, do not claim invention.
+
+### 1.5.6 The deterministic corrective hint (light complement)
+
+When Judix catches a failure, it can also return a rule-based corrective hint, not a model
+retry.
+
+- Agent, on a loop: `"you already made this exact call twice, break the loop and try a
+  different tool."`
+- RAG, on a contradiction: `"remove the unsupported claim: 30 days, the source says 14."`
+
+These hints are deterministic and cheap, so they help without leaning on a model. A full
+model-driven self-correction and retry loop is explicitly a **roadmap** item, not part of
+this update, because it is model-heavy and would dilute the deterministic core.
+
+### 1.5.7 The manual paste, kept as an optional path
+
+The paste-your-own-trace box stays available in both the agent and the RAG sections,
+clearly labeled as the manual option for people who want to check a single case by hand.
+It is not the hero and not the default. The live automatic hook is the main story. The
+manual box is a convenience.
+
+### 1.5.8 What stays frozen (do not touch)
+
+- The deterministic Rust engine: tool-call F1, loop detection, argument validation, the
+  faithfulness ratio.
+- The composite scoring, the weights, and the hard caps (step **49**, run **59**, RAG
+  **49**).
+- The three demos and their real numbers.
+- The existing endpoints. New capabilities are added around them; the core is not
+  rewritten.
+
+The only thin additions permitted inside the Rust core:
+
+- Adding the **`action`** field (`pass` / `flag` / `block`) to the scored report.
+- The **save-as-test** capture endpoint that persists a failing case as JSON, so the
+  flywheel has somewhere to write.
+
+### 1.5.9 Roadmap (noted, not in this update)
+
+- A full model-driven self-correction and retry loop with a correction budget and a human
+  escalation path.
+- Auto-instrumentation across frameworks, so even the one-line hook becomes zero lines for
+  supported stacks.
+- Drift tracking over time and a dashboard of failure patterns.
+
+### 1.5.10 Guardrails for the build that follows this spec
+
+- **Strong, effective, smooth.** The live hook and the flywheel must feel instant and
+  reliable, the deterministic verdict is the thing that must never lag, and the demo must
+  run live without a fumble.
+- Keep the framing and structure in this section exactly: two front doors, the playground
+  chooser plus agent and RAG sections with a live example and an optional manual box each,
+  the API page, the `action` field, the flywheel for both, the deterministic hint, and the
+  manual check as optional.
+- Do not overclaim. Deterministic, exact, free, open source. Not the only one doing
+  per-turn.
+- Do not touch the frozen Rust core except to add the `action` field and the save-as-test
+  capture, which are thin additions, not rewrites.
+
+---
+
 ## 2. System architecture
 
 Cargo workspace, three crates:

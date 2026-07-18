@@ -449,6 +449,44 @@
 
   .foot { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); text-align: right; }
 
+  /* action badge (pass/flag/block), workstream 1.4 */
+  .actiontag { display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; border: 1px solid; border-radius: 5px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+  /* save as regression test button, secondary to Grade */
+  .savetest { font-family: var(--body); font-size: 12.5px; font-weight: 500; border: 1px solid var(--hairline); border-radius: 9px; padding: 11px 15px; cursor: pointer; color: var(--ink-muted); background: #fff; display: inline-flex; align-items: center; gap: 7px; margin-right: 10px; transition: border-color .12s var(--ease-out), color .12s var(--ease-out); }
+  .savetest:hover { border-color: var(--accent-bd); color: var(--ink); }
+  /* corrective hint (workstream 4), a suggestion under the failing metric */
+  .fixhint { margin-top: 14px; border: 1px dashed var(--accent-bd); border-radius: 9px; padding: 11px 13px; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--paper-2); display: flex; gap: 9px; text-wrap: pretty; }
+  .fixhint .fixk { flex: none; font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .1em; color: var(--accent-warm); border: 1px solid color-mix(in oklab, var(--accent-warm) 40%, var(--hairline)); border-radius: 4px; padding: 2px 6px; height: fit-content; }
+  /* caught here marker in the per-turn timeline (workstream 2) */
+  .node.caught { background: var(--red-tint); }
+  .caughthere { display: flex; align-items: center; gap: 7px; margin: 2px 0 6px 34px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; color: var(--red-2); font-weight: 500; }
+  .caughthere i { font-size: 13px; }
+  /* eval flywheel (workstream 3) */
+  .flywheel-card { margin-top: 16px; border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); padding: 15px 16px; }
+  .fly-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .fly-acts { display: flex; gap: 8px; }
+  .fly-btn { font-family: var(--body); font-size: 12px; font-weight: 500; border: 1px solid var(--hairline); border-radius: 7px; padding: 6px 11px; cursor: pointer; background: #fff; color: var(--ink-muted); transition: border-color .12s var(--ease-out), color .12s var(--ease-out); }
+  .fly-btn:hover { border-color: var(--accent-bd); color: var(--ink); }
+  .fly-empty { font-size: 12.5px; color: var(--ink-faint); line-height: 1.5; text-wrap: pretty; }
+  .fly-note { font-size: 12.5px; color: var(--ink-muted); line-height: 1.5; margin-bottom: 10px; text-wrap: pretty; }
+  .fly-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hairline-soft); font-size: 12.5px; }
+  .fly-k { flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; color: var(--ink-faint); border: 1px solid var(--hairline); border-radius: 4px; padding: 2px 6px; }
+  .fly-name { flex: 1; min-width: 0; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fly-base { flex: none; font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
+  .fly-res { flex: none; font-family: var(--mono); font-size: 10.5px; font-weight: 600; }
+  .fly-x { flex: none; border: none; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+  .fly-x:hover { color: var(--red-2); }
+  /* playground chooser (workstream 2) */
+  .chooser { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); padding: 8px; display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .choose-card { flex: 1; min-width: 220px; text-align: left; border: 1px solid var(--hairline); border-radius: 10px; background: var(--paper-2); padding: 14px 15px; cursor: pointer; transition: border-color .14s var(--ease-out), transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+  .choose-card:hover { border-color: var(--accent-bd); transform: translateY(-2px); box-shadow: var(--sh-paper); }
+  .choose-card[aria-selected="true"] { border-color: var(--ink); background: #fff; }
+  .choose-card .ct { display: flex; align-items: center; gap: 8px; font-family: var(--disp); font-weight: 700; font-size: 15px; color: var(--ink); }
+  .choose-card .ct i { font-size: 17px; }
+  .choose-card[data-choose="agent"] .ct i { color: var(--red-2); }
+  .choose-card[data-choose="rag"] .ct i { color: var(--amber-2); }
+  .choose-card .cd { margin-top: 5px; font-size: 12.5px; color: var(--ink-muted); line-height: 1.45; text-wrap: pretty; }
+
   .notice { border: 1px solid; border-radius: var(--rp); padding: 16px 18px; font-size: 13.5px; line-height: 1.55; text-wrap: pretty; }
   .notice.info { border-color: var(--hairline); background: #fff; color: var(--ink-muted); }
   .notice.warn { border-color: color-mix(in oklab, var(--amber) 40%, var(--hairline)); background: var(--amber-tint); color: var(--amber-2); }
@@ -781,14 +819,15 @@ run_quality            <span class="fail"><span id="howRun">17.25</span>  red</s
           <p class="api-intro"><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Any language, any framework.</p>
           <div class="panel api-panel">
             <div class="api-step">
-              <div class="api-lbl"><span class="n">a</span>SEND</div>
-<pre><span class="cm"># agent: POST the trace</span>
-curl -N -X POST \
-  <span class="a">/score/agent/stream</span> \
-  -H <span class="k">'content-type: application/json'</span> \
-  --data <span class="s">@trace.json</span>
+              <div class="api-lbl"><span class="n">a</span>WIRE IT ONCE</div>
+<pre><span class="cm"># Python SDK, one hook, every turn scored live</span>
+<span class="k">from</span> judix <span class="k">import</span> JudixCallback
+judge = <span class="v">JudixCallback</span>(goal, expected_tools=[<span class="s">..</span>])
+agent.run(task, callbacks=[judge])   <span class="cm"># each step scored</span>
 
-<span class="cm"># rag: POST question + contexts + answer</span>
+<span class="cm"># or a raw call, any language</span>
+curl -N -X POST <span class="a">/score/agent/stream</span> \
+  --data <span class="s">@trace.json</span>
 curl -N -X POST <span class="a">/score/rag/stream</span> \
   --data <span class="s">@triple.json</span></pre>
             </div>
@@ -812,10 +851,12 @@ data: {
 <span class="cm">          {"start":0,"end":68,"contradicted":true} ] }</span></pre>
             </div>
             <div class="api-step">
-              <div class="api-lbl"><span class="n">c</span>ACT</div>
-<pre><span class="cm"># In your agent loop:</span>
-<span class="k">if</span> <span class="v">run_quality</span> &lt; <span class="viol">60</span>:
-  <span class="s">block</span>  <span class="cm"># block or flag before the user sees it</span></pre>
+              <div class="api-lbl"><span class="n">c</span>ACT ON THE ACTION</div>
+<pre><span class="cm"># the SDK derives pass / flag / block</span>
+<span class="cm"># block: quality &lt; 50 or a cap fired</span>
+<span class="cm"># (loop, tool-call, or a contradiction)</span>
+<span class="k">if</span> judge.action == <span class="s">"block"</span>:
+  stop()  <span class="cm"># before the reply is sent</span></pre>
             </div>
           </div>
         </div>
@@ -923,9 +964,20 @@ data: {
 
   <div class="pg-wrap">
     <div class="pg-lede">
-      <div class="pg-eyebrow">TRACE EXPLORER</div>
-      <h1>Grade a run. Click any step to see the evidence.</h1>
-      <p>Pick a run and Rust scores every step. Select a step on the left to inspect exactly what it did and why it scored that way, the same view your own traces get.</p>
+      <div class="pg-eyebrow">WHAT DO YOU WANT TO EVALUATE?</div>
+      <h1>Watch Judix grade an AI system live, one turn at a time.</h1>
+      <p>Pick a side. A live example runs and is scored as it streams, deterministic verdict first, model reason after. Click any turn or claim to see the evidence.</p>
+    </div>
+
+    <div class="chooser" id="chooser">
+      <button class="choose-card" data-choose="agent" aria-selected="true">
+        <div class="ct"><i class="ph ph-robot"></i>Score an AI agent</div>
+        <div class="cd">Catch the wrong tool, the loop, and the drift as the agent runs, before the reply is sent.</div>
+      </button>
+      <button class="choose-card" data-choose="rag" aria-selected="false">
+        <div class="ct"><i class="ph ph-quotes"></i>Score a RAG answer</div>
+        <div class="cd">Catch the hallucination, claim by claim, against the sources, before the user reads it.</div>
+      </button>
     </div>
 
     <div class="grid">
@@ -952,6 +1004,7 @@ data: {
         <div id="verdict"></div>
         <div id="detail"></div>
         <div class="foot" id="foot"></div>
+        <div class="flywheel-card" id="flywheel"></div>
       </div>
     </div>
   </div>
@@ -969,7 +1022,7 @@ data: {
     return x=>{ let t=x; for(let i=0;i<6;i++){ const e=fx(t)-x; if(Math.abs(e)<1e-4)break; const d=dfx(t); if(Math.abs(d)<1e-6)break; t-=e/d; } return fy(Math.max(0,Math.min(1,t))); };
   })();
   // strip em and en dashes from anything rendered from the API
-  const clean = s => (s == null ? '' : String(s).replace(/\s*[–—]\s*/g, ', '));
+  const clean = s => (s == null ? '' : String(s).replace(/\s*[\u2014\u2013]\s*/g, ', '));
   const esc = s => clean(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const round = n => Math.round(n); // ONE rounding rule for all displayed scores
   const bandStatus = b => b === 'green' ? 'pass' : b === 'amber' ? 'warn' : 'fail';
@@ -1185,8 +1238,17 @@ data: {
   let _hasModel = null;
   const hasModel = () => _hasModel === true;
 
+  function chooseKind(k) {
+    document.querySelectorAll('#chooser .choose-card').forEach(c => c.setAttribute('aria-selected', String(c.getAttribute('data-choose') === k)));
+    selectRun(k === 'rag' ? 2 : 1);
+  }
+  function syncChooser() {
+    const k = RUNS[S.runIdx] ? RUNS[S.runIdx].kind : 'agent';
+    document.querySelectorAll('#chooser .choose-card').forEach(c => c.setAttribute('aria-selected', String(c.getAttribute('data-choose') === k)));
+  }
+
   async function selectRun(idx) {
-    S.runIdx = idx; const r = RUNS[idx]; S.error = null;
+    S.runIdx = idx; const r = RUNS[idx]; S.error = null; syncChooser();
     if (S.cache[r.id]) {
       const c = S.cache[r.id];
       S.posted = c.posted; S.report = c.report; S.full = true; S.phase = 'graded'; S.streamed = c.streamed || {}; S.ragMetrics = c.ragMetrics || {}; S.claims = null;
@@ -1233,8 +1295,14 @@ data: {
   }
   function defaultSel() {
     if (!S.report || RUNS[S.runIdx].kind === 'rag') return;
-    const steps = (S.posted && S.posted.steps) || [];
-    let i = steps.findIndex(s => s.kind === 'tool_call' && s.name);
+    // Prefer the caught step (first loop fail) so its evidence and corrective hint show
+    // by default; otherwise the first tool call.
+    const rsteps = S.report.steps || [];
+    let i = rsteps.findIndex(s => (s.metrics || []).some(m => m.name === 'loop_free' && m.pass === false));
+    if (i < 0) {
+      const steps = (S.posted && S.posted.steps) || [];
+      i = steps.findIndex(s => s.kind === 'tool_call' && s.name);
+    }
     if (i < 0) i = 0;
     S.sel = i;
   }
@@ -1257,7 +1325,7 @@ data: {
   }
   function fail(kind, title, msg) { S.phase = 'error'; S.error = { kind, title, msg }; renderAll(); }
 
-  function renderAll() { renderRuns(); renderTree(); renderVerdict(); renderDetail(); renderFoot(); }
+  function renderAll() { renderRuns(); renderTree(); renderVerdict(); renderDetail(); renderFoot(); renderFlywheel(); }
   function scoreOf(r) { if (!r) return null; return r.rag_quality != null ? r.rag_quality : r.run_quality; }
 
   function renderRuns() {
@@ -1294,10 +1362,15 @@ data: {
     let nodes = [], label = '';
     if (kind === 'agent') {
       const steps = (S.report && S.report.steps) || (S.posted && S.posted.steps ? S.posted.steps.map((s, i) => ({ label: s.name || (s.kind + ' step'), na: false })) : []);
-      label = 'TRACE, ' + steps.length + ' STEPS';
+      label = 'TRACE, ' + steps.length + ' STEPS, TURN BY TURN';
+      // The turn Judix catches: the first LOOP fail, the genuine per-turn deterministic
+      // signal (tool-call correctness is a whole-run verdict, shown in the header). This
+      // is "caught here, before the reply is sent."
+      let caughtAt = -1;
+      if (S.report) caughtAt = steps.findIndex(s => (s.metrics || []).some(m => m.name === 'loop_free' && m.pass === false));
       nodes = steps.map((s, i) => ({
         i, idx: String(i).padStart(2, '0'),
-        name: s.label,
+        name: s.label, caught: i === caughtAt,
         scoreHtml: s.na ? '<span class="ns" style="color:var(--ink-faint)">skip</span>'
           : (S.report ? '<span class="ns" style="color:' + statusCss(bandStatus(s.band)) + '">' + round(s.step_quality) + '</span>' : '<span class="ns" style="color:var(--ink-faint)">..</span>'),
         dot: s.na ? 'var(--hairline)' : (S.report ? statusCssPanel(bandStatus(s.band)) : 'var(--hairline)'),
@@ -1319,11 +1392,12 @@ data: {
     $('tree-label').textContent = label;
     $('tree').innerHTML = nodes.map((n, k) => {
       const anim = S.phase === 'scoring' ? 'jp .7s infinite' : 'none';
-      return '<button class="node" aria-selected="' + (n.i === S.sel) + '" data-node="' + n.i + '">' +
+      return '<button class="node' + (n.caught ? ' caught' : '') + '" aria-selected="' + (n.i === S.sel) + '" data-node="' + n.i + '">' +
         '<span class="ni">' + n.idx + '</span>' +
         '<span class="nbr">' + (k === nodes.length - 1 ? 'L' : 'T') + '</span>' +
         '<span class="nn">' + esc(n.name) + '</span>' + n.scoreHtml +
-        '<span class="nd" style="background:' + n.dot + ';animation:' + anim + '"></span></button>';
+        '<span class="nd" style="background:' + n.dot + ';animation:' + anim + '"></span></button>' +
+        (n.caught ? '<div class="caughthere"><i class="ph ph-hand-palm"></i>caught here, before the reply is sent</div>' : '');
     }).join('');
   }
 
@@ -1332,6 +1406,114 @@ data: {
     if (kind === 'agent') return (rep.steps || []).filter(s => !s.na && s.band === 'red').length;
     const spans = ragClaims();
     return spans.filter(s => s.contradicted || s.supported === false).length;
+  }
+
+  // The action a developer branches on. Same rule as the SDK (spec 1.4), computed on the
+  // client from what the engine returns. block on a critical cap or quality below 50,
+  // flag on amber, pass on green. No model, no guessing.
+  function criticalCap(rep, kind) {
+    if (!rep) return false;
+    if (kind === 'rag') return ragClaims().some(s => s.contradicted);
+    return (rep.steps || []).some(s => (s.metrics || []).some(m => (m.name === 'loop_free' || m.name === 'tool_call_correctness') && m.pass === false));
+  }
+  function computeAction(rep, kind) {
+    if (!rep) return null;
+    const q = scoreOf(rep);
+    if (criticalCap(rep, kind)) return 'block';
+    if (q < 50) return 'block';
+    if (q < 80) return 'flag';
+    return 'pass';
+  }
+  const ACTION_CSS = { pass: 'var(--green-2)', flag: 'var(--amber-2)', block: 'var(--red-2)' };
+
+  // The deterministic corrective hint (spec, workstream 4). Rule based, from the data the
+  // engine already returns. No model, no retry. Returns {label, text} or null.
+  function correctiveHint(rep, kind, sel) {
+    if (!rep) return null;
+    if (kind === 'rag') {
+      const spans = ragClaims();
+      const c = spans[sel] || spans.find(s => s.contradicted);
+      if (c && c.contradicted) {
+        const ctx = (S.posted && S.posted.contexts) || [];
+        const src = ctx.find(x => /\b\d+\s*(business days?|days?)\b/i.test(x)) || ctx[0] || '';
+        return { label: 'FIX', text: 'Remove or correct the claim: "' + clean(c.text) + '". The source says: "' + clean(src) + '".' };
+      }
+      return null;
+    }
+    const step = (rep.steps || [])[sel];
+    if (!step) return null;
+    const loop = (step.metrics || []).find(m => m.name === 'loop_free' && m.pass === false);
+    if (loop) {
+      const inp = (S.posted && S.posted.steps && S.posted.steps[sel]) || {};
+      const n = loop.raw_value != null ? Math.round(loop.raw_value) + 1 : 2;
+      const a = inp.args ? '(' + Object.entries(inp.args).map(([k, v]) => k + ' ' + (typeof v === 'string' ? v : JSON.stringify(v))).join(', ') + ')' : '';
+      return { label: 'FIX', text: 'You already called ' + (inp.name || 'this tool') + a + ' ' + n + ' times. Break the loop: try a different tool or different arguments.' };
+    }
+    const invalid = (step.metrics || []).find(m => m.name === 'tool_call_correctness' && m.pass === false && m.reason);
+    if (invalid) return { label: 'FIX', text: clean(invalid.reason) };
+    return null;
+  }
+
+  // ---- Eval flywheel (workstream 3), client side, held in the browser ----
+  const FLY_KEY = 'judix_saved_tests';
+  function loadTests() { try { return JSON.parse(localStorage.getItem(FLY_KEY) || '[]'); } catch (e) { return []; } }
+  function storeTests(t) { try { localStorage.setItem(FLY_KEY, JSON.stringify(t)); } catch (e) {} }
+  function saveCurrentAsTest() {
+    if (!S.report || !S.full) return;
+    const kind = RUNS[S.runIdx].kind;
+    const tests = loadTests();
+    const baseQ = round(scoreOf(S.report));
+    const rec = {
+      id: 'T' + Date.now(), kind, name: RUNS[S.runIdx].id + ' (' + (S.posted.goal ? clean(S.posted.goal).slice(0, 30) : 'rag') + ')',
+      payload: S.posted, baseline: { quality: baseQ, band: S.report.band, action: computeAction(S.report, kind) },
+    };
+    tests.unshift(rec); storeTests(tests); renderFlywheel();
+  }
+  async function scorePayload(kind, payload) {
+    const url = kind === 'rag' ? '/score/rag' : '/score/agent';
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.status === 501) return null;
+    return res.ok ? res.json() : null;
+  }
+  async function runAllTests() {
+    const tests = loadTests(); if (!tests.length) return;
+    const btn = $('flyRunAll'); if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+    for (const t of tests) {
+      const rep = await scorePayload(t.kind, t.payload);
+      t.last = rep ? { quality: round(scoreOf(rep)), band: rep.band, action: computeAction(rep, t.kind) } : null;
+      // A case passes if it still scores the same band and action as its baseline.
+      t.result = rep ? (t.last.band === t.baseline.band && t.last.action === t.baseline.action ? 'pass' : 'fail') : 'error';
+    }
+    storeTests(tests); if (btn) { btn.disabled = false; btn.textContent = 'Run all'; } renderFlywheel();
+  }
+  function exportTests() {
+    const tests = loadTests();
+    const suite = { suite: 'judix-regression', generated_by: 'judix playground', cases: tests.map(t => ({ name: t.name, kind: t.kind, input: t.payload, baseline: t.baseline })) };
+    const blob = new Blob([JSON.stringify(suite, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'judix-regression.json'; a.click(); URL.revokeObjectURL(a.href);
+  }
+  function deleteTest(id) { storeTests(loadTests().filter(t => t.id !== id)); renderFlywheel(); }
+  function renderFlywheel() {
+    const box = $('flywheel'); if (!box) return;
+    const tests = loadTests();
+    let h = '<div class="fly-h"><span class="sec-lbl" style="margin:0">SAVED REGRESSION TESTS</span>';
+    if (tests.length) h += '<div class="fly-acts"><button class="fly-btn" id="flyRunAll">Run all</button><button class="fly-btn" id="flyExport">Export JSON</button></div>';
+    h += '</div>';
+    if (!tests.length) {
+      h += '<div class="fly-empty">Every failure Judix catches can become a regression test. Save a red run, and your eval suite writes itself.</div>';
+    } else {
+      h += '<div class="fly-note">Every failure Judix catches becomes a regression test. Your eval suite writes itself.</div>';
+      h += tests.map(t => {
+        const rc = t.result === 'pass' ? 'var(--green-2)' : t.result === 'fail' ? 'var(--red-2)' : t.result === 'error' ? 'var(--ink-faint)' : '';
+        const rlabel = t.result === 'pass' ? 'still ' + t.baseline.band : t.result === 'fail' ? 'REGRESSED, now ' + (t.last ? t.last.band : '?') : t.result === 'error' ? 'model off' : '';
+        return '<div class="fly-row"><span class="fly-k">' + (t.kind === 'rag' ? 'RAG' : 'AGENT') + '</span>' +
+          '<span class="fly-name">' + esc(t.name) + '</span>' +
+          '<span class="fly-base">baseline ' + t.baseline.quality + ' ' + t.baseline.band + ' &middot; ' + t.baseline.action + '</span>' +
+          (rlabel ? '<span class="fly-res" style="color:' + rc + '">' + rlabel + '</span>' : '') +
+          '<button class="fly-x" data-del="' + t.id + '" title="remove">&times;</button></div>';
+      }).join('');
+    }
+    box.innerHTML = h;
   }
 
   function renderVerdict() {
@@ -1347,9 +1529,11 @@ data: {
     const share = (rep && rep.deterministic_share != null) ? Math.round(rep.deterministic_share * 100) + '%' : null;
     const measured = S.doneAt != null ? Math.round(S.doneAt) + ' ms' : (S.detAt != null ? Math.round(S.detAt) + ' ms' : '..');
 
+    const action = computeAction(rep, kind);
+    const actionTag = action ? '<span class="actiontag" style="color:' + ACTION_CSS[action] + ';border-color:' + ACTION_CSS[action] + '">' + action + '</span>' : '';
     let h = '<div class="verdict"><div class="vtop">' +
       '<div><div class="vscore" id="vscore" data-count="verdict" style="color:' + col + '">' + (score != null ? score : '..') + '</div>' +
-      '<div class="vk">' + (kind === 'rag' ? 'RAG quality' : 'Run quality') + ' &middot; ' + band + '</div></div>' +
+      '<div class="vk">' + (kind === 'rag' ? 'RAG quality' : 'Run quality') + ' &middot; ' + band + ' ' + actionTag + '</div></div>' +
       '<div class="vstats">' +
         '<div class="vstat"><div class="vv" style="color:' + (issues > 0 ? 'var(--red-2)' : 'var(--ink)') + '">' + (issues == null ? '..' : issues) + '</div><div class="vl">' + (issues === 1 ? 'issue found' : 'issues found') + '</div></div>' +
         '<div class="vstat"><div class="vv">' + measured + '</div><div class="vl">grade time</div></div>' +
@@ -1357,6 +1541,7 @@ data: {
         '<div class="vstat"><div class="vv">$0' + (rep && rep.model_cost_usd ? ' <span style="color:var(--ink-faint);font-size:11px">list ~$' + rep.model_cost_usd.toFixed(5) + '</span>' : '') + '</div><div class="vl">model cost</div></div>' +
       '</div>' +
       '<div style="flex:1"></div>' +
+      (graded && (action === 'block' || action === 'flag') ? '<button class="savetest" id="saveTestBtn" title="Turn this caught failure into a regression test"><i class="ph ph-bookmark-simple" style="font-size:13px"></i>Save as regression test</button>' : '') +
       '<button class="grade" id="gradeBtn"' + (scoring ? ' disabled' : '') + '><i class="ph ph-play-fill" style="font-size:14px"></i>' + (scoring ? 'Scoring...' : 'Grade') + '</button>' +
       '</div>';
 
@@ -1461,7 +1646,10 @@ data: {
       const why = off ? 'model layer off, deterministic scoring still applied' : (S.report ? 'awaiting the narrator' : 'awaiting score');
       h += '<div class="metric pending" data-metric="' + n + '"><div class="mrow"><span class="src model">MODEL</span><span class="lab">' + n.replace(/_/g, ' ') + '</span><span class="val">' + val + '</span></div><div class="why">' + why + '</div></div>';
     });
-    h += '</div></div>';
+    h += '</div>';
+    const hint = correctiveHint(S.report, 'agent', S.sel);
+    if (hint) h += '<div class="fixhint"><span class="fixk">' + hint.label + '</span><span>' + esc(hint.text) + '</span></div>';
+    h += '</div>';
     return h;
   }
 
@@ -1514,6 +1702,8 @@ data: {
       const linked = /\b\d+\s*(business days?|days?)\b/i.test(c) && claim.contradicted;
       h += '<div class="ctxbox ' + (linked ? 'linked' : '') + '"><div class="ci">SOURCE ' + (i + 1) + '</div><div class="ct">' + ctxHighlight(c, true) + '</div></div>';
     });
+    const hint = correctiveHint(S.report, 'rag', S.sel);
+    if (hint) h += '<div class="fixhint"><span class="fixk">' + hint.label + '</span><span>' + esc(hint.text) + '</span></div>';
     h += '</div>';
     return h;
   }
@@ -1531,6 +1721,13 @@ data: {
     const node = e.target.closest('[data-node]');
     if (node) { S.sel = +node.getAttribute('data-node'); renderTree(); renderDetail(); return; }
     if (e.target.closest('#gradeBtn')) { if (S.phase !== 'scoring') grade(); return; }
+    if (e.target.closest('#saveTestBtn')) { saveCurrentAsTest(); return; }
+    if (e.target.closest('#flyRunAll')) { runAllTests(); return; }
+    if (e.target.closest('#flyExport')) { exportTests(); return; }
+    const del = e.target.closest('[data-del]');
+    if (del) { deleteTest(del.getAttribute('data-del')); return; }
+    const choose = e.target.closest('[data-choose]');
+    if (choose) { chooseKind(choose.getAttribute('data-choose')); return; }
   });
   $('pasteBtn').addEventListener('click', () => {
     const raw = $('input').value.trim();
