@@ -592,7 +592,7 @@
           <div class="lbl">A REAL RUN JUDIX FLAGS IN 4 STEPS</div>
           <p class="quote">The agent was told to book a table for two on Friday, avoiding downtown. It searched <span class="viol">downtown</span> three times, then said "let me try downtown again".</p>
           <div class="verdict-line">
-            <span class="score">17</span>
+            <span class="score" id="downtownRun">17</span>
             <span class="tag">/ 100 &middot; RED</span>
             <span class="cap">capped at 59 by a critical fail</span>
           </div>
@@ -660,8 +660,8 @@ loop_free              step 1  <span class="pass">100  pass</span>
                        step 2   <span class="warn">75  fail</span>
                        step 3   <span class="warn">50  fail</span>
 
-step_quality           <span class="fail">0  33  29  25  0</span>
-run_quality            <span class="fail">17.25  red</span>
+step_quality           <span class="fail" id="howSteps">0  33  29  25  0</span>
+run_quality            <span class="fail"><span id="howRun">17.25</span>  red</span>
                        <span class="k">capped at 59, critical fail</span></div>
             <div class="verdict-strip">
               <span class="k">RUN</span><span class="v">17.25</span>
@@ -695,7 +695,7 @@ run_quality            <span class="fail">17.25  red</span>
       <div class="panel" style="margin-top:36px">
         <div class="panel-hd">
           <span class="lbl">RUN, <span class="a">WRONG_TOOL</span>, TURN BY TURN</span>
-          <span class="et-final-line">final <span class="score">17</span> RED</span>
+          <span class="et-final-line">final <span class="score" id="etFinal">17</span> RED</span>
         </div>
         <div class="et-body">
           <div class="et-row">
@@ -772,11 +772,11 @@ curl -N -X POST <span class="a">/score/rag/stream</span> \
               <div class="api-lbl"><span class="n">b</span>GET BACK</div>
 <pre><span class="cm">event: deterministic</span>
 data: {
-  <span class="k">"run_quality":</span> <span class="viol">17.25</span>,
+  <span class="k">"run_quality":</span> <span class="viol" id="apiRun">17.25</span>,
   <span class="k">"band":</span> <span class="s">"red"</span>,
   <span class="k">"deterministic_share":</span> <span class="v">0.375</span>,
   <span class="k">"steps":</span> [
-    { <span class="k">"step_quality":</span> <span class="viol">33</span>,
+    { <span class="k">"step_quality":</span> <span class="viol" id="apiStep">33</span>,
       <span class="k">"band":</span> <span class="s">"red"</span>,
       <span class="k">"metrics":</span> [<span class="k">..</span>] }
   ]
@@ -785,7 +785,7 @@ data: {
 <span class="cm"># rag returns rag_quality + unsupported_spans</span>
 <span class="cm">data: { "rag_quality": 49, "band": "red",</span>
 <span class="cm">        "unsupported_spans": [</span>
-<span class="cm">          {"start":0,"end":26,"contradicted":true} ] }</span></pre>
+<span class="cm">          {"start":0,"end":68,"contradicted":true} ] }</span></pre>
             </div>
             <div class="api-step">
               <div class="api-lbl"><span class="n">c</span>ACT</div>
@@ -824,34 +824,22 @@ data: {
           </div>
         </div>
         <div class="side">
-          <div class="cta-answer"><span class="cta-src" style="display:block;margin-bottom:8px"><span class="k">THE ANSWER</span></span>You have <span class="contra">30 days</span> from delivery to return an item for a full refund, as long as it is unused and in its original packaging.</div>
-          <div class="claim-list">
+          <div class="cta-answer" id="ctaAnswer"><span class="cta-src" style="display:block;margin-bottom:8px"><span class="k">THE ANSWER</span></span>You have <span class="contra">30 days</span> from delivery to return an item for a full refund, as long as it is unused and in its original packaging.</div>
+          <div class="claim-list" id="claimList">
             <div class="claim-row contra">
               <span class="c-tag">Contradicted</span>
-              <span class="c-text">30 days to return</span>
-              <span class="c-src">source 1 says 14 days</span>
+              <span class="c-text">"30 days" to return</span>
+              <span class="c-src">the sources say 14 days</span>
             </div>
             <div class="claim-row sup">
               <span class="c-tag">Supported</span>
-              <span class="c-text">for a full refund</span>
-              <span class="c-src">source 1</span>
-            </div>
-            <div class="claim-row sup">
-              <span class="c-tag">Supported</span>
-              <span class="c-text">must be unused</span>
-              <span class="c-src">source 2</span>
-            </div>
-            <div class="claim-row sup">
-              <span class="c-tag">Supported</span>
-              <span class="c-text">in original packaging</span>
-              <span class="c-src">source 2</span>
+              <span class="c-text">the other claims in the answer</span>
+              <span class="c-src">grounded in the sources</span>
             </div>
           </div>
-          <div class="cta-summary">
+          <div class="cta-summary" id="ctaSummary">
             <span class="k">faithfulness</span>
-            <span class="v"><span class="pass">3</span>/4 grounded</span>
-            <span class="dot">&middot;</span>
-            <span class="v red">1 contradicts</span>
+            <span class="v red">a claim contradicts the sources</span>
             <span class="arrow">&rarr;</span>
             <span class="v red">rag_quality capped at 49, red</span>
           </div>
@@ -1531,6 +1519,112 @@ data: {
   });
 
   fetch('/health').then(r => r.json()).then(j => { _hasModel = !!(j.model_layer && String(j.model_layer).indexOf('disabled') < 0); }).catch(() => {});
+
+  /* ============================= LANDING: paint from live engine =============================
+     Every model-derived number on the landing is updated from the real engine output on load.
+     Deterministic values (F1 0.42, loop 100/75/50, caps at 49 and 59, deterministic_share 0.375)
+     stay hardcoded because they never vary. Model-derived values (step_quality, run_quality,
+     claim decomposition, rag_quality text) get repainted from the live response so what a judge
+     sees always matches what the engine returns right now. */
+  const escHtml = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  function paintWrongTool(rep) {
+    const steps = rep.steps || [];
+    const stepScores = steps.map(s => Math.round(s.step_quality));
+    const runInt = Math.round(rep.run_quality);
+    const runFine = (Math.round(rep.run_quality * 100) / 100).toFixed(2);
+
+    // Hero panel: mutate HERO scores so the running animation picks them up on the next frame
+    if (typeof HERO !== 'undefined' && HERO && HERO.length) {
+      stepScores.forEach((sc, i) => { if (HERO[i]) HERO[i].score = sc; });
+    }
+
+    setText('downtownRun', runInt);
+    setText('etFinal', runInt);
+    setText('howSteps', stepScores.join('  '));
+    setText('howRun', runFine);
+    setText('apiRun', runFine);
+    if (stepScores[1] != null) setText('apiStep', stepScores[1]);
+
+    // Every-turn timeline: repaint each row's step + running mean run_quality
+    const rows = document.querySelectorAll('#every-turn .et-row');
+    let sum = 0;
+    stepScores.forEach((sc, i) => {
+      sum += sc;
+      const run = Math.round(sum / (i + 1));
+      const row = rows[i]; if (!row) return;
+      const stepEl = row.querySelector('.et-stepq .v');
+      const runEl = row.querySelector('.et-runq .v');
+      if (stepEl) stepEl.textContent = sc;
+      if (runEl) runEl.textContent = run;
+    });
+  }
+
+  function paintRag(rep, fx) {
+    const answer = (fx && fx.answer) || '';
+    const spans = (rep.unsupported_spans || []).filter(s => s.end > s.start).sort((a, b) => a.start - b.start);
+    if (!spans.length) return;
+    const supported = spans.filter(s => s.supported).length;
+    const contra = spans.filter(s => s.contradicted).length;
+    const ragQ = Math.round(rep.rag_quality);
+
+    // Answer with contradicted spans highlighted in place by real char offsets
+    const ans = document.getElementById('ctaAnswer');
+    if (ans) {
+      let html = '<span class="cta-src" style="display:block;margin-bottom:8px"><span class="k">THE ANSWER</span></span>';
+      let cur = 0;
+      for (const s of spans) {
+        if (s.start < cur) continue;
+        html += escHtml(answer.slice(cur, s.start));
+        const seg = escHtml(answer.slice(s.start, s.end));
+        html += s.contradicted ? '<span class="contra">' + seg + '</span>' : seg;
+        cur = s.end;
+      }
+      html += escHtml(answer.slice(cur));
+      ans.innerHTML = html;
+    }
+
+    // Rebuild the claim list from the real spans
+    const list = document.getElementById('claimList');
+    if (list) {
+      list.innerHTML = spans.map(s => {
+        const cls = s.contradicted ? 'contra' : (s.supported === true ? 'sup' : 'sup');
+        const tag = s.contradicted ? 'Contradicted' : (s.supported === true ? 'Supported' : 'Unsupported');
+        const src = s.contradicted ? 'the sources say 14 days' : 'grounded in the sources';
+        const text = String(s.text || '').replace(/^["\s]+|["\s.]+$/g, '');
+        return '<div class="claim-row ' + cls + '"><span class="c-tag">' + tag + '</span><span class="c-text">' + escHtml(text) + '</span><span class="c-src">' + src + '</span></div>';
+      }).join('');
+    }
+
+    // Summary counts, real
+    const summaryEl = document.getElementById('ctaSummary');
+    if (summaryEl) {
+      summaryEl.innerHTML =
+        '<span class="k">faithfulness</span>' +
+        '<span class="v"><span class="pass">' + supported + '</span>/' + spans.length + ' grounded</span>' +
+        '<span class="dot">&middot;</span>' +
+        '<span class="v red">' + contra + ' contradict' + (contra === 1 ? 's' : '') + '</span>' +
+        '<span class="arrow">&rarr;</span>' +
+        '<span class="v red">rag_quality capped at ' + ragQ + ', red</span>';
+    }
+  }
+
+  async function loadLive() {
+    // wrong_tool: agent scoring works with or without a model key
+    try {
+      const fx = await (await fetch('/demo/wrong_tool')).json();
+      const res = await fetch('/score/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fx) });
+      if (res.ok) paintWrongTool(await res.json());
+    } catch (e) {}
+    // rag_hallucination: needs the model layer, returns 501 without a key
+    try {
+      const fx = await (await fetch('/demo/rag_hallucination')).json();
+      const res = await fetch('/score/rag', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fx) });
+      if (res.ok) paintRag(await res.json(), fx);
+    } catch (e) {}
+  }
+  loadLive();
 
   window.addEventListener('hashchange', applyRoute);
   applyRoute();
