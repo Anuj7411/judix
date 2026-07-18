@@ -433,6 +433,70 @@
   .notice.warn b, .notice.err b { color: inherit; }
   .notice .mono { display: block; margin-top: 6px; font-size: 12px; opacity: .85; }
 
+  /* every-turn timeline panel */
+  .et-final-line { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--on-panel-muted); letter-spacing: .14em; }
+  .et-final-line .score { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--red); font-variant-numeric: tabular-nums slashed-zero; letter-spacing: 0; }
+  .et-body { padding: 0; }
+  .et-row { display: grid; grid-template-columns: 76px minmax(0,220px) minmax(0,1fr) auto auto; gap: 16px; padding: 12px 20px; align-items: center; border-top: 1px solid var(--panel-line); position: relative; }
+  .et-row:first-child { border-top: none; }
+  @media (max-width: 820px) { .et-row { grid-template-columns: 76px 1fr auto auto; gap: 8px 12px; padding: 12px 18px; } .et-detail { grid-column: 1 / -1; padding-left: 88px; } }
+  .et-idx { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--on-panel-faint); }
+  .et-what { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .et-name { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--on-panel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .et-kind { font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; flex: none; }
+  .et-kind.tool { color: var(--accent-2); background: rgba(76,123,242,.10); border: 1px solid rgba(76,123,242,.22); }
+  .et-kind.llm { color: var(--on-panel-muted); background: rgba(164,170,184,.08); border: 1px solid rgba(164,170,184,.16); }
+  .et-detail { font-family: var(--mono); font-size: 12px; color: var(--on-panel-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .et-detail .viol { color: var(--red); font-weight: 600; }
+  .et-stepq, .et-runq { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums slashed-zero; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .et-stepq .k, .et-runq .k { font-size: 10px; letter-spacing: .1em; color: var(--on-panel-faint); }
+  .et-stepq .v { font-size: 15px; font-weight: 600; color: var(--on-panel); }
+  .et-runq .v { font-size: 13px; font-weight: 600; color: var(--on-panel-muted); }
+  .et-stepq.red .v { color: var(--red); }
+  .et-runq.red .v { color: var(--red); font-weight: 600; }
+  .et-row.caught { background: rgba(239,83,80,.06); border-left: 3px solid var(--red); padding-left: 17px; }
+  .et-row.final { background: rgba(239,83,80,.04); }
+  .et-callout { margin: 12px 20px 4px; padding: 12px 15px; border: 1px solid rgba(239,83,80,.32); background: rgba(239,83,80,.08); border-radius: 8px; display: flex; align-items: baseline; gap: 12px; font-size: 13px; line-height: 1.55; color: var(--on-panel); flex-wrap: wrap; }
+  .et-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--red); background: rgba(239,83,80,.22); padding: 4px 9px; border-radius: 4px; font-weight: 600; flex: none; }
+
+  /* rag claim breakdown, inside cta-panel */
+  .claim-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .claim-row { display: grid; grid-template-columns: 124px minmax(0,1fr) auto; gap: 12px; padding: 10px 13px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel-2); align-items: center; }
+  @media (max-width: 640px) { .claim-row { grid-template-columns: 1fr; gap: 4px; } }
+  .claim-row.contra { border-color: rgba(239,83,80,.35); background: rgba(239,83,80,.08); }
+  .claim-row.sup { border-color: rgba(52,208,138,.20); }
+  .c-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em; font-weight: 600; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; text-align: center; }
+  .claim-row.sup .c-tag { color: var(--green); background: rgba(52,208,138,.16); }
+  .claim-row.contra .c-tag { color: var(--red); background: rgba(239,83,80,.20); }
+  .c-text { font-size: 13.5px; color: var(--on-panel); }
+  .claim-row.contra .c-text { color: var(--red); font-weight: 600; }
+  .c-src { font-family: var(--mono); font-size: 11px; color: var(--on-panel-muted); }
+  .claim-row.contra .c-src { color: var(--red); }
+  .cta-summary { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel-3); font-family: var(--mono); font-size: 12px; color: var(--on-panel-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; line-height: 1.4; }
+  .cta-summary .k { color: var(--on-panel-faint); letter-spacing: .06em; text-transform: uppercase; font-size: 10px; }
+  .cta-summary .v { color: var(--on-panel); font-weight: 600; }
+  .cta-summary .v .pass { color: var(--green); }
+  .cta-summary .v.red { color: var(--red); }
+  .cta-summary .arrow, .cta-summary .dot { color: var(--on-panel-faint); }
+  .cta-hint { margin: 12px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--on-panel-muted); font-style: italic; }
+
+  /* api three-part integration panel */
+  .api-intro { margin: 0 0 4px; font-size: 13.5px; line-height: 1.55; color: var(--ink-muted); }
+  .api-intro b { color: var(--ink); font-weight: 600; }
+  .api-panel { display: flex; flex-direction: column; }
+  .api-panel .api-step { padding: 15px 18px; border-top: 1px solid var(--panel-line); }
+  .api-panel .api-step:first-child { border-top: none; }
+  .api-lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; color: var(--accent-2); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 9px; }
+  .api-lbl .n { color: var(--on-panel-faint); font-weight: 400; }
+  .api-step pre { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--on-panel); white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+  .api-step .cm { color: var(--on-panel-faint); }
+  .api-step .a { color: var(--accent-2); }
+  .api-step .s { color: var(--on-panel); }
+  .api-step .k { color: var(--on-panel-muted); }
+  .api-step .v { color: var(--on-panel); font-weight: 600; }
+  .api-step .viol { color: var(--red); font-weight: 600; }
+  .api-step .pass { color: var(--green); font-weight: 600; }
+
   /* motion tokens */
   @keyframes jp { 0%,100% { opacity:1; } 50% { opacity:.3; } }
   @keyframes jb { 0%,100% { opacity:.85; } 50% { opacity:.35; } }
@@ -623,32 +687,112 @@ run_quality            <span class="fail">17.25  red</span>
     </div>
   </section>
 
+  <section class="band" id="every-turn">
+    <div class="band-in">
+      <div class="eyebrow"><span class="n">03</span>&thinsp;/&thinsp;EVERY TURN</div>
+      <h2>Your agent, scored every turn.</h2>
+      <p class="lead">Judix scores every turn as it happens. The moment run_quality drops below 60, you stop the run before the reply is sent.</p>
+      <div class="panel" style="margin-top:36px">
+        <div class="panel-hd">
+          <span class="lbl">RUN, <span class="a">WRONG_TOOL</span>, TURN BY TURN</span>
+          <span class="et-final-line">final <span class="score">17</span> RED</span>
+        </div>
+        <div class="et-body">
+          <div class="et-row">
+            <span class="et-idx">TURN 1</span>
+            <span class="et-what"><span class="et-name">plan</span> <span class="et-kind llm">LLM</span></span>
+            <span class="et-detail">"I'll look for restaurants downtown."</span>
+            <span class="et-stepq"><span class="k">step</span><span class="v">0</span></span>
+            <span class="et-runq"><span class="k">run</span><span class="v">0</span></span>
+          </div>
+          <div class="et-row caught">
+            <span class="et-idx">TURN 2</span>
+            <span class="et-what"><span class="et-name">search_restaurants</span> <span class="et-kind tool">TOOL_CALL</span></span>
+            <span class="et-detail">area:<span class="viol">"downtown"</span>, party_size:2, day:"Friday"</span>
+            <span class="et-stepq red"><span class="k">step</span><span class="v">33</span></span>
+            <span class="et-runq red"><span class="k">run</span><span class="v">17</span></span>
+          </div>
+          <div class="et-callout">
+            <span class="et-tag">CAUGHT AT TURN 2</span>
+            <span>tool_call_correctness F1 0.42 FAIL. Deterministic engine flags the wrong tool, no model needed. run_quality below 60. Stop the run here, before the reply is sent.</span>
+          </div>
+          <div class="et-row">
+            <span class="et-idx">TURN 3</span>
+            <span class="et-what"><span class="et-name">search_restaurants</span> <span class="et-kind tool">TOOL_CALL</span></span>
+            <span class="et-detail">identical call, loop_free 75, repeat x1</span>
+            <span class="et-stepq red"><span class="k">step</span><span class="v">29</span></span>
+            <span class="et-runq red"><span class="k">run</span><span class="v">21</span></span>
+          </div>
+          <div class="et-row">
+            <span class="et-idx">TURN 4</span>
+            <span class="et-what"><span class="et-name">search_restaurants</span> <span class="et-kind tool">TOOL_CALL</span></span>
+            <span class="et-detail">identical call, loop_free 50, repeat x2</span>
+            <span class="et-stepq red"><span class="k">step</span><span class="v">25</span></span>
+            <span class="et-runq red"><span class="k">run</span><span class="v">22</span></span>
+          </div>
+          <div class="et-row final">
+            <span class="et-idx">TURN 5</span>
+            <span class="et-what"><span class="et-name">reply</span> <span class="et-kind llm">LLM</span></span>
+            <span class="et-detail">"Let me try downtown again."</span>
+            <span class="et-stepq red"><span class="k">step</span><span class="v">0</span></span>
+            <span class="et-runq red"><span class="k">final</span><span class="v">17</span></span>
+          </div>
+        </div>
+        <div class="panel-ft">
+          <span>engine: rust, deterministic, one verdict per turn</span>
+          <span>catch fires at turn 2, run below 60</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="band alt" id="where">
     <div class="band-in">
-      <div class="eyebrow"><span class="n">03</span>&thinsp;/&thinsp;WHERE YOU USE IT</div>
+      <div class="eyebrow"><span class="n">04</span>&thinsp;/&thinsp;WHERE YOU USE IT</div>
       <h2>Two front doors, one engine.</h2>
       <div class="where">
         <div class="where-col">
           <div class="hd">IN YOUR APP</div>
-          <h3>Framework-agnostic. Anything that speaks HTTP.</h3>
-          <div class="panel">
-            <div class="body"><span class="cm"># In your agent loop, after every step:</span>
-curl -N -X POST <span class="a">https://judix-8piu.onrender.com</span>
+          <h3>An HTTP call your agent makes.</h3>
+          <p class="api-intro"><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Any language, any framework.</p>
+          <div class="panel api-panel">
+            <div class="api-step">
+              <div class="api-lbl"><span class="n">a</span>SEND</div>
+<pre><span class="cm"># agent: POST the trace</span>
+curl -N -X POST \
   <span class="a">/score/agent/stream</span> \
-  -H <span class="s">'content-type: application/json'</span> \
+  -H <span class="k">'content-type: application/json'</span> \
   --data <span class="s">@trace.json</span>
 
-<span class="cm">event: deterministic</span>
-<span class="cm">data: {"run_quality":17.25,"band":"red",..}</span>
+<span class="cm"># rag: POST question + contexts + answer</span>
+curl -N -X POST <span class="a">/score/rag/stream</span> \
+  --data <span class="s">@triple.json</span></pre>
+            </div>
+            <div class="api-step">
+              <div class="api-lbl"><span class="n">b</span>GET BACK</div>
+<pre><span class="cm">event: deterministic</span>
+data: {
+  <span class="k">"run_quality":</span> <span class="viol">17.25</span>,
+  <span class="k">"band":</span> <span class="s">"red"</span>,
+  <span class="k">"deterministic_share":</span> <span class="v">0.375</span>,
+  <span class="k">"steps":</span> [
+    { <span class="k">"step_quality":</span> <span class="viol">33</span>,
+      <span class="k">"band":</span> <span class="s">"red"</span>,
+      <span class="k">"metrics":</span> [<span class="k">..</span>] }
+  ]
+}
 
-<span class="cm">event: metric</span>
-<span class="cm">data: {"step_index":1,"metric":{..}}</span>
-
-<span class="cm">event: done</span>
-<span class="cm">data: {..final report..}</span>
-
-<span class="cm"># if run_quality &lt; 60, catch it now,</span>
-<span class="cm"># before the reply is sent.</span></div>
+<span class="cm"># rag returns rag_quality + unsupported_spans</span>
+<span class="cm">data: { "rag_quality": 49, "band": "red",</span>
+<span class="cm">        "unsupported_spans": [</span>
+<span class="cm">          {"start":0,"end":26,"contradicted":true} ] }</span></pre>
+            </div>
+            <div class="api-step">
+              <div class="api-lbl"><span class="n">c</span>ACT</div>
+<pre><span class="cm"># In your agent loop:</span>
+<span class="k">if</span> <span class="v">run_quality</span> &lt; <span class="viol">60</span>:
+  <span class="s">block</span>  <span class="cm"># block or flag before the user sees it</span></pre>
+            </div>
           </div>
         </div>
 
@@ -672,19 +816,46 @@ curl -N -X POST <span class="a">https://judix-8piu.onrender.com</span>
     <div class="cta-dark-in">
       <div class="cta-panel">
         <div>
-          <h2>See the contradiction in the answer.</h2>
-          <p>Judix decomposes a RAG answer into claims, grounds each one against the retrieved sources, and highlights the one that conflicts. Averages hide hallucinations. Judix caps them.</p>
+          <h2>See every claim, grounded or contradicted.</h2>
+          <p>Judix decomposes a RAG answer into atomic claims and grounds each one against the retrieved sources. Averages would hide the one bad claim. Judix caps the score when any claim contradicts the source.</p>
           <div class="cta-actions">
             <a class="grade" href="#playground"><i class="ph ph-play-circle" style="font-size:18px"></i>Grade the RAG demo</a>
             <a class="btn-ghost" href="https://github.com/Anuj7411/judix">Read the spec &rarr;</a>
           </div>
         </div>
         <div class="side">
-          <div class="cta-answer">You have <span class="contra">30 days</span> from delivery to return an item for a full refund, as long as it is unused and in its original packaging.</div>
-          <div class="cta-src">
-            <span class="k">SOURCE 1:</span> Returns are allowed within <span class="hit">14 days</span> of delivery.<br>
-            <span class="k">RAG QUALITY:</span> <span style="color:var(--red);font-weight:600">49 &middot; RED</span>, capped, a claim contradicts the context.
+          <div class="cta-answer"><span class="cta-src" style="display:block;margin-bottom:8px"><span class="k">THE ANSWER</span></span>You have <span class="contra">30 days</span> from delivery to return an item for a full refund, as long as it is unused and in its original packaging.</div>
+          <div class="claim-list">
+            <div class="claim-row contra">
+              <span class="c-tag">Contradicted</span>
+              <span class="c-text">30 days to return</span>
+              <span class="c-src">source 1 says 14 days</span>
+            </div>
+            <div class="claim-row sup">
+              <span class="c-tag">Supported</span>
+              <span class="c-text">for a full refund</span>
+              <span class="c-src">source 1</span>
+            </div>
+            <div class="claim-row sup">
+              <span class="c-tag">Supported</span>
+              <span class="c-text">must be unused</span>
+              <span class="c-src">source 2</span>
+            </div>
+            <div class="claim-row sup">
+              <span class="c-tag">Supported</span>
+              <span class="c-text">in original packaging</span>
+              <span class="c-src">source 2</span>
+            </div>
           </div>
+          <div class="cta-summary">
+            <span class="k">faithfulness</span>
+            <span class="v"><span class="pass">3</span>/4 grounded</span>
+            <span class="dot">&middot;</span>
+            <span class="v red">1 contradicts</span>
+            <span class="arrow">&rarr;</span>
+            <span class="v red">rag_quality capped at 49, red</span>
+          </div>
+          <p class="cta-hint">Averages would hide the one bad claim. Judix caps the score when any claim contradicts the source.</p>
         </div>
       </div>
     </div>
@@ -692,7 +863,7 @@ curl -N -X POST <span class="a">https://judix-8piu.onrender.com</span>
 
   <section class="band" id="compare">
     <div class="band-in">
-      <div class="eyebrow"><span class="n">04</span>&thinsp;/&thinsp;COMPARE</div>
+      <div class="eyebrow"><span class="n">05</span>&thinsp;/&thinsp;COMPARE</div>
       <h2>Offline evals answer last week. Judix answers now.</h2>
       <div class="cmp">
         <div class="r head">
