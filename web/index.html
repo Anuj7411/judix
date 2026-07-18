@@ -15,41 +15,40 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f%5B%5D=cabinet-grotesk@500,600,700,800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
 <style>
   :root {
-    /* paper */
-    --paper: #FAFAFA;
-    --paper-2: #F1F2F3;
-    --paper-3: #E7E8EA;
-    --ink: #141414;
-    --ink-muted: #6B6E76;
-    --ink-faint: #9A9CA3;
-    --hairline: #E4E5E8;
-    --hairline-soft: #EEEFF1;
+    /* paper, pure white per brief */
+    --paper: #FFFFFF;
+    --paper-2: #F5F5F4;   /* bone, from Logo System */
+    --paper-3: #EFEDE7;
+    --ink: #0D0D0F;       /* canonical Logo System ink */
+    --ink-muted: #4A4A4E;
+    --ink-faint: #6E6E73;
+    --hairline: #E8E6E1;  /* warm hairline from Logo System */
+    --hairline-soft: #F1EFEA;
     /* panel, dark instrument */
-    --panel: #121213;
-    --panel-2: #1B1B1D;
-    --panel-3: #262628;
-    --panel-line: #2C2C30;
+    --panel: #14121A;     /* Logo System dark tile */
+    --panel-2: #1B1922;
+    --panel-3: #262230;
+    --panel-line: #262230;
     --panel-hair: #22222490;
-    --on-panel: #F2F2F3;
+    --on-panel: #E9E6F0;
     --on-panel-muted: #A2A4AB;
-    --on-panel-faint: #6C6E75;
-    /* silver, brand chip + quiet UI marks (never a status color) */
-    --silver: #9A9CA3;
-    /* warm complement, restricted to landing chrome (eyebrow, LIVE dot, link hover) */
+    --on-panel-faint: #8A8A90;
+    /* silver, canonical brand chip grey from the Logo System (headings use this too) */
+    --silver: #9A9AA0;
+    /* warm complement, primary CTA + link hover per new brief */
     --accent-warm: #E2542E;
-    /* accent = ink for CTAs. --accent-2 is the on-dark emphasis, set to silver so quiet
-       marks inside dark panels read as brand-chip grey, not as loud white. */
-    --accent: #141414;
-    --accent-2: #9A9CA3;
+    /* accent = ink for CTAs where we want black; primary buttons use warm below. */
+    --accent: #0D0D0F;
+    --accent-2: #9A9AA0;
     --accent-deep: #000000;
-    --accent-tint: rgba(20,20,20,.06);
-    --accent-tint-2: #F1F2F3;
-    --accent-bd: #D0D2D6;
+    --accent-tint: rgba(13,13,15,.06);
+    --accent-tint-2: #F5F5F4;
+    --accent-bd: #C8C8CD;
     /* status, score only */
     --green: #34D08A;
     --amber: #E7A93C;
@@ -81,7 +80,8 @@
   }
   a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--hairline); text-underline-offset: 3px; }
   a:hover { color: var(--accent-warm); text-decoration-color: var(--accent-warm); }
-  h1, h2, h3, h4 { font-family: var(--disp); font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; margin: 0; }
+  /* Per brief: every heading takes the Logo System silver (#9A9AA0). Body stays ink. */
+  h1, h2, h3, h4 { font-family: var(--disp); font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; margin: 0; color: var(--silver); }
   button { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
   ::selection { background: rgba(20,20,20,.14); }
@@ -94,25 +94,27 @@
   @media (max-width: 640px) { .nav-in { padding: 0 20px; } }
   .brand { display: flex; align-items: baseline; gap: 11px; min-width: 0; }
   .brand .mark { display: flex; align-items: center; gap: 9px; }
-  /* Chip-i wordmark: "Judix" with the dot of the 'i' replaced by a silver chip. The 'i'
-     character is rendered transparent so its natural dot never shows; the shaft and chip
-     are drawn as pseudo-elements so font metrics can't misalign the mark. */
-  .j-brand { font-family: var(--disp); font-weight: 800; font-size: 20px; letter-spacing: -0.028em; color: var(--ink); line-height: 1; display: inline-flex; align-items: baseline; text-decoration: none; }
+  /* Chip-i wordmark, exact construction from Judix Logo System.dc.html section 11:
+     "Jud" + column-stack (chip on top, stem below) + "x". Bricolage Grotesque 700 with
+     letter-spacing -0.03em. All chip/stem proportions are in em so the whole mark scales
+     with a single font-size. */
+  .j-brand { font-family: "Bricolage Grotesque", var(--disp); font-weight: 700; font-size: 20px; letter-spacing: -0.03em; color: var(--ink); line-height: 1; display: inline-flex; align-items: flex-end; text-decoration: none; }
   .j-brand:hover { color: var(--ink); text-decoration: none; }
-  .j-brand .j-idot { position: relative; color: transparent; }
-  .j-brand .j-idot::before { content: ""; position: absolute; left: 50%; bottom: 0.02em; transform: translateX(-50%); width: 0.18em; height: 0.58em; background: var(--ink); border-radius: 0.02em; }
-  .j-brand .j-idot::after { content: ""; position: absolute; left: 50%; top: -0.08em; transform: translateX(-50%); width: 0.4em; height: 0.28em; border-radius: 0.08em; background: var(--silver); }
-  /* pg-back and small contexts: just the silver chip as a compact icon */
-  .j-chip-icon { display: inline-block; width: 14px; height: 8px; border-radius: 2px; background: var(--silver); flex: none; }
+  .j-brand .j-idot { display: inline-flex; flex-direction: column; align-items: center; gap: 0.07em; margin: 0 0.05em 0.20em; }
+  .j-brand .j-chip { width: 0.16em; height: 0.16em; border-radius: 0.04em; background: var(--silver); }
+  .j-brand .j-stem { width: 0.17em; height: 0.48em; border-radius: 0.06em; background: currentColor; }
+  /* Footer variant: white ink + slightly deeper silver chip, matches Logo System reversed lockup */
   .footer .j-brand { color: #fff; }
-  .footer .j-brand .j-idot::before { background: #fff; }
+  .footer .j-brand .j-chip { background: #8A8A90; }
+  /* pg-back and small contexts: standalone silver chip icon */
+  .j-chip-icon { display: inline-block; width: 6px; height: 6px; border-radius: 1.5px; background: var(--silver); flex: none; }
   /* Legacy jmark/jword kept for any remaining references, retinted for the new system */
   .jmark { width: 20px; height: 12px; border-radius: 3px; background: var(--silver); display: inline-block; }
-  .jword { font-family: var(--disp); font-size: 19px; font-weight: 800; letter-spacing: -0.025em; color: var(--ink); }
+  .jword { font-family: "Bricolage Grotesque", var(--disp); font-size: 19px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
   .brand .ver { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
   .navlinks { display: flex; align-items: center; gap: 26px; font-size: 14px; white-space: nowrap; }
-  .navlinks .navlink { color: var(--ink-muted); font-weight: 500; }
-  .navlinks .navlink:hover { color: var(--ink); text-decoration: none; }
+  .navlinks .navlink { color: var(--ink); font-weight: 500; text-decoration: none; }
+  .navlinks .navlink:hover { color: var(--accent-warm); text-decoration: none; }
   @media (max-width: 720px) { .navlinks .navlink { display: none; } }
   .gh { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: #fff; font-family: var(--body); font-size: 13px; font-weight: 600; border-radius: 8px; padding: 8px 14px; white-space: nowrap; box-shadow: 0 1px 2px rgba(23,25,34,.14), 0 6px 14px rgba(23,25,34,.14); transition: transform .12s var(--ease-out), background .12s var(--ease-out); }
   .gh:hover { color: #fff; background: #23273A; text-decoration: none; }
@@ -131,11 +133,15 @@
   @media (max-width: 960px) { .hero-in { grid-template-columns: 1fr; gap: 44px; padding: 56px 24px 64px; } }
   .heron { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; margin-bottom: 22px; }
   .heron .d { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-warm); box-shadow: 0 0 0 4px rgba(226,84,46,.14); animation: jp 1.8s infinite; }
+  /* Hero headline: heading text inherits silver from the h1/h2/h3/h4 rule. The
+     trailing period keeps warm as a single accent point (the brief explicitly says
+     other colors are fine where needed, and this one dot of warm gives the mono-grey
+     headline its only life). */
   .lead-h1 { font-family: var(--disp); font-size: clamp(40px, 5.4vw, 56px); line-height: 1.02; font-weight: 800; letter-spacing: -0.035em; }
-  .lead-h1 .a { color: var(--ink); }
+  .lead-h1 .a { color: inherit; }
   .lead-h1 .r { color: var(--accent-warm); }
-  .lead-h2 { margin-top: 18px; font-family: var(--disp); font-size: clamp(22px, 2.6vw, 26px); line-height: 1.14; font-weight: 600; color: var(--ink-muted); letter-spacing: -0.018em; }
-  .lead-h2 .a { color: var(--ink); }
+  .lead-h2 { margin-top: 18px; font-family: var(--disp); font-size: clamp(22px, 2.6vw, 26px); line-height: 1.14; font-weight: 600; letter-spacing: -0.018em; }
+  .lead-h2 .a { color: inherit; }
   .lead-h2 .r { color: var(--accent-warm); }
   .lead-sub { margin-top: 20px; font-size: 16px; line-height: 1.55; color: var(--ink-muted); max-width: 44ch; }
   .lead-sub b { color: var(--ink); font-weight: 600; }
@@ -152,8 +158,8 @@
   .install-cmd .p { color: var(--accent); }
 
   .hero-ctas { margin-top: 30px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-  .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff; font-weight: 600; font-size: 14.5px; padding: 12px 22px; border-radius: 9px; white-space: nowrap; border: none; cursor: pointer; text-decoration: none; box-shadow: 0 1px 2px rgba(20,20,20,.14), 0 8px 20px rgba(20,20,20,.16); transition: background .12s var(--ease-out), transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
-  .btn-primary:hover { background: var(--accent-deep); color: #fff; text-decoration: none; box-shadow: 0 1px 2px rgba(20,20,20,.16), 0 10px 26px rgba(20,20,20,.22); }
+  .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--accent-warm); color: #fff; font-weight: 600; font-size: 14.5px; padding: 12px 22px; border-radius: 9px; white-space: nowrap; border: none; cursor: pointer; text-decoration: none; box-shadow: 0 1px 2px rgba(13,13,15,.10), 0 8px 20px rgba(226,84,46,.28); transition: background .12s var(--ease-out), transform .12s var(--ease-out), box-shadow .12s var(--ease-out); }
+  .btn-primary:hover { background: #C43A1B; color: #fff; text-decoration: none; box-shadow: 0 1px 2px rgba(13,13,15,.12), 0 10px 26px rgba(226,84,46,.36); }
   .btn-primary:active { transform: translateY(1px) scale(.985); }
   .btn-link { font-size: 14px; color: var(--ink-muted); font-weight: 500; }
   .btn-link:hover { color: var(--ink); text-decoration: none; }
@@ -284,8 +290,8 @@
   .cta-src { font-family: var(--mono); font-size: 11.5px; line-height: 1.6; color: var(--on-panel-muted); }
   .cta-src .k { color: var(--on-panel-faint); }
   .cta-src .hit { color: var(--green); font-weight: 600; }
-  .cta-panel .grade { display: inline-flex; align-items: center; gap: 8px; background: var(--paper); color: var(--ink); font-weight: 600; font-size: 14.5px; padding: 12px 22px; border-radius: 9px; white-space: nowrap; border: none; cursor: pointer; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 8px 20px rgba(0,0,0,.30); transition: background .12s var(--ease-out); }
-  .cta-panel .grade:hover { background: #fff; color: var(--ink); text-decoration: none; }
+  .cta-panel .grade { display: inline-flex; align-items: center; gap: 8px; background: var(--accent-warm); color: #fff; font-weight: 600; font-size: 14.5px; padding: 12px 22px; border-radius: 9px; white-space: nowrap; border: none; cursor: pointer; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.28), 0 10px 24px rgba(226,84,46,.36); transition: background .12s var(--ease-out); }
+  .cta-panel .grade:hover { background: #C43A1B; color: #fff; text-decoration: none; }
   .cta-actions { margin-top: 24px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
   .cta-actions .btn-ghost { color: var(--on-panel-muted); font-size: 14px; font-weight: 500; }
   .cta-actions .btn-ghost:hover { color: var(--on-panel); text-decoration: none; }
@@ -374,8 +380,8 @@
   .vstats { display: flex; gap: 22px; flex-wrap: wrap; }
   .vstat .vv { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums slashed-zero; color: var(--ink); }
   .vstat .vl { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--ink-faint); margin-top: 5px; }
-  .grade { font-family: var(--body); font-size: 13px; font-weight: 600; letter-spacing: .02em; border: none; border-radius: 9px; padding: 12px 22px; cursor: pointer; color: #fff; background: var(--accent); box-shadow: 0 1px 2px rgba(20,20,20,.14), 0 8px 18px rgba(20,20,20,.18); transition: background .12s var(--ease-out), transform .12s var(--ease-out); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-  .grade:hover { background: var(--accent-deep); color: #fff; text-decoration: none; }
+  .grade { font-family: var(--body); font-size: 13px; font-weight: 600; letter-spacing: .02em; border: none; border-radius: 9px; padding: 12px 22px; cursor: pointer; color: #fff; background: var(--accent-warm); box-shadow: 0 1px 2px rgba(13,13,15,.10), 0 8px 18px rgba(226,84,46,.28); transition: background .12s var(--ease-out), transform .12s var(--ease-out); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+  .grade:hover { background: #C43A1B; color: #fff; text-decoration: none; }
   .grade:active { transform: translateY(1px) scale(.985); }
   .grade[disabled] { background: var(--paper-3); color: var(--ink-faint); box-shadow: none; cursor: default; }
   .runlevel { margin-top: 14px; border-top: 1px solid var(--hairline-soft); padding-top: 12px; font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-muted); }
@@ -534,7 +540,7 @@
   <header class="nav">
     <div class="nav-in">
       <div class="brand">
-        <a class="j-brand" href="#/" aria-label="Judix">Jud<span class="j-idot">i</span>x</a>
+        <a class="j-brand" href="#/" aria-label="Judix">Jud<span class="j-idot" aria-hidden="true"><span class="j-chip"></span><span class="j-stem"></span></span>x</a>
         <span class="ver">v0.1.0</span>
       </div>
       <nav class="navlinks">
@@ -890,7 +896,7 @@ data: {
   <footer class="footer">
     <div class="footer-in">
       <div class="brand">
-        <a class="j-brand" href="#/" aria-label="Judix">Jud<span class="j-idot">i</span>x</a>
+        <a class="j-brand" href="#/" aria-label="Judix">Jud<span class="j-idot" aria-hidden="true"><span class="j-chip"></span><span class="j-stem"></span></span>x</a>
         <span class="tagline">A scoring engine for agents and RAG.</span>
       </div>
       <div class="links">
