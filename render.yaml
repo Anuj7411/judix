@@ -43,3 +43,9 @@ services:
       # stay in the pool for availability; the cache key is (model, input).
       - key: JUDIX_CACHE_TTL_SECS
         value: "86400"
+      # Raised from the 20/min default for a judging window: several people clicking
+      # through the playground can each spend a scoring request, and the cache already
+      # keeps repeat/demo scores from re-spending model calls. 60/min leaves generous
+      # headroom without risking the free daily model quota.
+      - key: JUDIX_RATE_LIMIT_PER_MIN
+        value: "60"

@@ -241,10 +241,50 @@ async fn api_info() -> Json<Value> {
     }))
 }
 
+/// Boundary guards: reject inputs that cannot be meaningfully scored, with a clear 422,
+/// before spending any model calls. These validate the request shape only; the
+/// deterministic scoring engine is untouched.
+fn validate_trace(trace: &AgentTrace) -> Result<(), String> {
+    for (i, s) in trace.steps.iter().enumerate() {
+        if s.kind == "tool_call" {
+            let named = s.name.as_ref().map(|n| !n.trim().is_empty()).unwrap_or(false);
+            if !named {
+                return Err(format!(
+                    "step {i}: a \"tool_call\" step must carry a non-empty \"name\"."
+                ));
+            }
+            if let Some(a) = &s.args {
+                if !a.is_object() && !a.is_null() {
+                    return Err(format!(
+                        "step {i}: \"args\" must be a JSON object, e.g. {{\"area\":\"downtown\"}}."
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_triple(t: &RagTriple) -> Result<(), String> {
+    if t.answer.trim().is_empty() {
+        return Err("\"answer\" must not be empty; there is nothing to ground.".to_string());
+    }
+    if t.contexts.iter().all(|c| c.trim().is_empty()) {
+        return Err("\"contexts\" must contain at least one non-empty source.".to_string());
+    }
+    Ok(())
+}
+
 async fn score_agent_handler(
     State(state): State<AppState>,
     Json(trace): Json<AgentTrace>,
 ) -> impl IntoResponse {
+    if let Err(msg) = validate_trace(&trace) {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "error": "invalid_input", "message": msg })),
+        );
+    }
     let t0 = std::time::Instant::now();
 
     let (model_metrics, cost) = match &state.model {
@@ -261,6 +301,12 @@ async fn score_rag_handler(
     State(state): State<AppState>,
     Json(triple): Json<RagTriple>,
 ) -> impl IntoResponse {
+    if let Err(msg) = validate_triple(&triple) {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "error": "invalid_input", "message": msg })),
+        );
+    }
     let client = match &state.model {
         Some(c) => c,
         None => {
@@ -324,6 +370,10 @@ async fn score_agent_stream(
     Json(trace): Json<AgentTrace>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let stream = async_stream::stream! {
+        if let Err(msg) = validate_trace(&trace) {
+            yield Ok(sse_event("error", &json!({ "status": "invalid_input", "message": msg })));
+            return;
+        }
         let t0 = std::time::Instant::now();
 
         // 1. The hero: real scores, zero model calls, ~1ms — on screen before any
@@ -371,6 +421,10 @@ async fn score_rag_stream(
     Json(triple): Json<RagTriple>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let stream = async_stream::stream! {
+        if let Err(msg) = validate_triple(&triple) {
+            yield Ok(sse_event("error", &json!({ "status": "invalid_input", "message": msg })));
+            return;
+        }
         let t0 = std::time::Instant::now();
 
         let Some(client) = state.model.clone() else {

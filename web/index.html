@@ -1244,7 +1244,7 @@
       else if (ev === 'metric') onMetric(d);
       else if (ev === 'claims') { S.claims = d.claims; defaultSelRag(); renderTree(); renderDetail(); }
       else if (ev === 'done') { S.report = d; S.full = true; S.phase = 'graded'; S.doneAt = performance.now() - S.t0; cacheRun(); renderAll(); }
-      else if (ev === 'error') { if (d.status === 'model_required') model501(d); else fail('err', 'Scoring error', clean(d.message)); }
+      else if (ev === 'error') { if (d.status === 'model_required') model501(d); else if (d.status === 'invalid_input') fail('warn', 'Invalid input', clean(d.message)); else fail('err', 'Scoring error', clean(d.message)); }
     });
     if (seq === gradeSeq && S.phase === 'scoring') { S.phase = 'graded'; renderAll(); }
   }
@@ -1282,6 +1282,7 @@
     if (d.status === 429) fail('warn', 'Rate limited', (clean(body.message) || 'Too many scoring requests this minute.') + ' Retry in ' + (d.res.headers.get('Retry-After') || '60') + 's.');
     else if (d.status === 501) model501(body);
     else if (d.status === 404) fail('warn', 'Unknown demo', 'Valid ids: ' + ((body.valid || []).join(', ') || 'clean, wrong_tool, rag_hallucination') + '.');
+    else if (d.status === 422) fail('warn', 'Invalid input', clean(body.message || body.error) || 'That input cannot be scored.');
     else fail('err', 'Server error ' + d.status, clean(body.error || body.message) || 'The scoring request failed.');
   }
   function model501(body) {
