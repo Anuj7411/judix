@@ -697,6 +697,13 @@
   @keyframes jb { 0%,100% { opacity:.85; } 50% { opacity:.35; } }
   @keyframes chip-in { from { opacity:0; transform: translateY(5px); } to { opacity:1; transform: none; } }
   @keyframes wipe-x { from { transform: scaleX(0); } }
+  /* claude.design handoff keyframes */
+  @keyframes pulseRed { 0%,100%{ box-shadow:0 0 0 0 rgba(224,90,64,.5); } 50%{ box-shadow:0 0 0 6px rgba(224,90,64,0); } }
+  @keyframes blink { 0%,49%{ opacity:1; } 50%,100%{ opacity:0; } }
+  @keyframes stepIn { from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+  @keyframes barGrow { from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+  @keyframes sqPop { 0%{ opacity:.15; transform:scale(.6); } 60%{ transform:scale(1.15); } 100%{ opacity:1; transform:scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .dc-anim, [style*="animation:blink"], [style*="animation:pulseRed"] { animation: none !important; } }
   .chip-in { animation: chip-in .22s var(--ease-out) both; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .06ms !important; }
@@ -817,66 +824,28 @@
       <div class="eyebrow"><span class="n">02</span>&thinsp;/&thinsp;HOW IT WORKS</div>
       <h2>Two passes over every step, on real data.</h2>
       <p class="lead">Not a mock. The panels below show the actual wrong_tool run, scored by the <span class="kb">real engine</span>.</p>
-      <div class="how">
-        <div class="how-col">
-          <div class="step-lbl"><span class="n">01</span>THE TRACE</div>
-          <h3>A step your agent took.</h3>
-          <div class="panel">
-            <div class="body"><span class="k">POST</span> <span class="a">/score/agent/stream</span>
-{
-  <span class="k">"goal":</span> <span class="s">"Book a dinner table for 2 on</span>
-<span class="s">          Friday, avoiding downtown."</span>,
-  <span class="k">"steps":</span> [
-    { <span class="k">"kind":</span> <span class="s">"tool_call"</span>,
-      <span class="k">"name":</span> <span class="s">"search_restaurants"</span>,
-      <span class="k">"args":</span> {
-        <span class="k">"area":</span> <span class="viol">"downtown"</span>,
-        <span class="k">"party_size":</span> 2,
-        <span class="k">"day":</span> <span class="s">"Friday"</span>
-      } },
-    ..
-  ],
-  <span class="k">"expected_tools":</span> [<span class="s">"search_restaurants"</span>,
-                     <span class="s">"check_availability"</span>,
-                     <span class="s">"book_table"</span>]
-}</div>
-          </div>
-          <p class="cap">The raw JSON your agent produces, streamed to Judix.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:40px">
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:16px;padding:24px;box-shadow:0 20px 50px -34px rgba(38,32,26,.5);display:flex;flex-direction:column;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="font:800 13px 'JetBrains Mono';color:#fff;background:#2C2925;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center">01</span><span style="font:600 10px 'JetBrains Mono';letter-spacing:.14em;color:#A79E92">THE TRACE</span></div>
+          <h3 style="font:600 20px 'Bricolage Grotesque';letter-spacing:-.01em;margin:0 0 14px">A step your agent took.</h3>
+          <div style="background:#211E1B;border-radius:11px;padding:15px;font:500 11px/1.7 'JetBrains Mono';color:#B7AFA4;flex:1;overflow-x:auto"><span style="color:#8C857B">POST /score/agent/stream</span><br>{ <span style="color:#E7B94E">"goal"</span>: "book a table&hellip;",<br>&nbsp;&nbsp;<span style="color:#E7B94E">"steps"</span>: [<br>&nbsp;&nbsp;&nbsp;{ <span style="color:#E7B94E">"name"</span>:<span style="color:#E05A40">"search"</span>,<br>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#E7B94E">"area"</span>:<span style="color:#E05A40">"downtown"</span> } ]<br>}</div>
+          <p style="font:400 13px/1.5 'Instrument Sans';color:#8A837A;margin:14px 0 0">The raw JSON your agent produces, streamed to Judix.</p>
         </div>
-
-        <div class="how-col">
-          <div class="step-lbl"><span class="n">02</span>RUST JUDGES</div>
-          <h3>The engine scores, in Rust, at $0.</h3>
-          <div class="panel">
-            <div class="body">tool_call_correctness  <span class="fail">41.67  FAIL</span>
-  <span class="k">raw F1</span>  0.42, off by 2/3 tools
-
-loop_free              step 1  <span class="pass">100  pass</span>
-                       step 2   <span class="warn">75  fail</span>
-                       step 3   <span class="warn">50  fail</span>
-
-step_quality           <span class="fail" id="howSteps">0  33  24  20  0</span>
-run_quality            <span class="fail"><span id="howRun">15.25</span>  red</span>
-                       <span class="k">capped at 59, critical fail</span></div>
-            <div class="verdict-strip">
-              <span class="k">RUN</span><span class="v" id="howRunBig">15.25</span>
-              <span class="sp"></span>
-              <span class="cap">rust caps it, critical fail</span>
-            </div>
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:16px;padding:24px;box-shadow:0 20px 50px -34px rgba(38,32,26,.5);display:flex;flex-direction:column;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="font:800 13px 'JetBrains Mono';color:#fff;background:#C0532B;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center">02</span><span style="font:600 10px 'JetBrains Mono';letter-spacing:.14em;color:#A79E92">RUST JUDGES</span></div>
+          <h3 style="font:600 20px 'Bricolage Grotesque';letter-spacing:-.01em;margin:0 0 14px">The engine scores, in Rust, at $0.</h3>
+          <div style="flex:1;display:flex;flex-direction:column;gap:9px">
+            <div style="background:#F8F7F4;border:1px solid rgba(0,0,0,.06);border-radius:9px;padding:11px 13px"><div style="display:flex;justify-content:space-between;font:600 12px 'JetBrains Mono'"><span style="color:#6E675E">tool_call</span><span style="color:#C24034">41.67 FAIL</span></div><div style="height:5px;border-radius:5px;background:#EFE9E0;overflow:hidden;margin-top:7px"><div style="height:100%;width:42%;background:#C24034;border-radius:5px"></div></div></div>
+            <div style="background:#F8F7F4;border:1px solid rgba(0,0,0,.06);border-radius:9px;padding:11px 13px"><div style="display:flex;justify-content:space-between;font:600 12px 'JetBrains Mono'"><span style="color:#6E675E">loop_free</span><span style="color:#B58A2A">50 &middot; &times;2</span></div><div style="height:5px;border-radius:5px;background:#EFE9E0;overflow:hidden;margin-top:7px"><div style="height:100%;width:50%;background:#C6902F;border-radius:5px"></div></div></div>
+            <div style="background:#FBEDEA;border:1px solid #F0CBC3;border-radius:9px;padding:11px 13px"><div style="display:flex;justify-content:space-between;font:700 12px 'JetBrains Mono'"><span style="color:#8a3a30">run_quality</span><span style="color:#C24034">15.25 RED</span></div></div>
           </div>
-          <p class="cap">The wrong tool and the loop are caught in Rust, deterministically. That alone caps the run and makes it red, before any model runs.</p>
+          <p style="font:400 13px/1.5 'Instrument Sans';color:#8A837A;margin:14px 0 0">The wrong tool and the loop are caught deterministically, before any model runs.</p>
         </div>
-
-        <div class="how-col">
-          <div class="step-lbl"><span class="n">03</span>MODEL NARRATES</div>
-          <h3>One sentence you can act on.</h3>
-          <div class="panel">
-            <div class="body quote-panel">
-              "Searched downtown, but the goal said avoid it."
-              <span class="attrib">MODEL, ONE LINE PER SCORE</span>
-            </div>
-          </div>
-          <p class="cap">The model only fills in the why. Deterministic verdicts are final.</p>
+        <div style="background:#211E1B;border-radius:16px;padding:24px;box-shadow:0 24px 56px -30px rgba(20,16,12,.6);display:flex;flex-direction:column;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><span style="font:800 13px 'JetBrains Mono';color:#211E1B;background:#E7B94E;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center">03</span><span style="font:600 10px 'JetBrains Mono';letter-spacing:.14em;color:#8C857B">MODEL NARRATES</span></div>
+          <h3 style="font:600 20px 'Bricolage Grotesque';letter-spacing:-.01em;margin:0 0 14px;color:#fff">One sentence you can act on.</h3>
+          <div style="flex:1;display:flex;align-items:center"><p style="font:500 18px/1.5 'Instrument Sans';color:#EDE9E1;margin:0">&ldquo;Searched downtown, but the goal said avoid it.&rdquo;<span style="display:inline-block;width:2px;height:17px;background:#E7B94E;margin-left:3px;vertical-align:-2px;animation:blink 1s step-end infinite"></span></p></div>
+          <div style="font:600 9px 'JetBrains Mono';letter-spacing:.12em;color:#6E675E;margin-top:14px">MODEL &middot; ONE LINE PER SCORE &middot; DETERMINISTIC VERDICTS ARE FINAL</div>
         </div>
       </div>
     </div>
