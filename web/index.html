@@ -209,6 +209,7 @@
   .hero-row .why .t { font-size: 12.5px; line-height: 1.55; color: var(--on-panel-muted); }
 
   /* ==================== SECTION BAND ==================== */
+  section[id] { scroll-margin-top: 84px; }
   .band { border-top: 1px solid var(--hairline); background: var(--paper); }
   .band.alt { background: var(--paper-2); }
   .band-in { max-width: 1200px; margin: 0 auto; padding: 60px 32px; }
@@ -276,13 +277,43 @@
   .where-col .panel .body .s { color: var(--on-panel); }
   .where-col .panel .body .e { color: var(--amber); }
   .where-col .light-panel { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; padding: 22px 24px; box-shadow: var(--sh-paper); }
-  .where-col .light-panel .row { display: flex; gap: 14px; padding: 14px 0; align-items: baseline; flex: 1; }
+  .where-col .light-panel .row { display: flex; gap: 14px; padding: 14px 0; align-items: baseline; }
   .where-col .light-panel .row + .row { border-top: 1px solid var(--hairline-soft); }
   .where-col .light-panel .row .num { color: var(--accent-warm); font-family: var(--mono); font-size: 11px; font-weight: 600; width: 26px; flex: none; letter-spacing: .06em; }
   .where-col .light-panel .row .txt { font-size: 14px; line-height: 1.5; color: var(--ink); }
   .where-col .light-panel .row .txt b { font-weight: 600; }
   .where-col .light-panel .cta { margin-top: auto; padding-top: 16px; }
   .where-tail { grid-column: 1 / -1; margin-top: 16px; text-align: center; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
+
+  /* where you use it v2: stacked blocks, step by step, visuals on the right */
+  .usewrap { display: flex; flex-direction: column; gap: 48px; margin-top: 40px; }
+  .use-block .hd { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--accent-warm); font-weight: 600; }
+  .use-block h3 { font-family: var(--disp); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 10px 0 0; }
+  .use-block > p { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink-muted); max-width: 62ch; }
+  .steps-3 { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; align-items: start; }
+  .step-card { border-radius: var(--rp); background: var(--panel); box-shadow: var(--sh-panel); overflow: hidden; }
+  .step-card .api-lbl { display: flex; align-items: center; gap: 9px; padding: 12px 15px; border-bottom: 1px solid var(--panel-line); font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--on-panel-muted); }
+  .step-card .api-lbl .n { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 5px; background: var(--accent-warm); color: #fff; font-size: 10px; font-weight: 700; }
+  .step-card pre { margin: 0; padding: 14px 15px; font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: var(--on-panel-muted); overflow-x: auto; white-space: pre; }
+  .step-card pre .cm { color: var(--on-panel-faint); } .step-card pre .k { color: var(--on-panel); } .step-card pre .a { color: var(--accent-2); } .step-card pre .s { color: var(--amber); } .step-card pre .v { color: var(--on-panel); } .step-card pre .viol { color: var(--red); font-weight: 600; }
+  .steps-visual { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; align-items: stretch; }
+  .pstep { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); display: flex; flex-direction: column; overflow: hidden; }
+  .pstep .pnum { padding: 14px 16px 0; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--accent-warm); letter-spacing: .06em; }
+  .pstep .ptext { padding: 7px 16px 15px; font-size: 13.5px; line-height: 1.45; color: var(--ink); }
+  .pstep .pvis { margin-top: auto; padding: 15px 16px; border-top: 1px solid var(--panel-line); background: var(--panel); color: var(--on-panel); min-height: 74px; display: flex; align-items: center; }
+  .mini-runs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mini-runs .mp { font-family: var(--mono); font-size: 10px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--panel-line); color: var(--on-panel-muted); }
+  .mini-runs .mp.on { border-color: var(--red); color: var(--red); }
+  .mini-verdict { display: flex; align-items: baseline; gap: 10px; }
+  .mini-verdict .mv-n { font-family: var(--disp); font-size: 30px; font-weight: 800; color: var(--red); font-variant-numeric: tabular-nums; line-height: 1; }
+  .mini-verdict .mv-m { font-family: var(--mono); font-size: 10px; color: var(--on-panel-faint); }
+  .mini-model { font-family: var(--body); font-size: 12px; color: var(--on-panel-muted); line-height: 1.45; }
+  .mini-model .mtag { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 4px; color: var(--on-panel-muted); margin-right: 7px; }
+  .mini-detail { font-family: var(--mono); font-size: 11px; color: var(--on-panel-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .mini-detail .mfail { color: var(--red); font-weight: 600; }
+  .use-block .cta { margin-top: 22px; }
+  .where-tail { margin-top: 4px; text-align: center; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
+  @media (max-width: 560px) { .steps-3, .steps-visual { grid-template-columns: 1fr; } }
 
   /* dark cta strip (replaces yellow) */
   .cta-dark { border-top: 1px solid var(--hairline); background: var(--paper-2); }
@@ -394,6 +425,12 @@
   .paste textarea::placeholder { color: var(--ink-faint); }
   .paste textarea:focus-visible { border-color: var(--accent); outline: none; }
   .paste .go { margin-top: 8px; }
+  /* Make "your own" clearly distinct from the EXAMPLE runs */
+  #scoreOwnBtn { color: var(--accent-warm); }
+  #scoreOwnBtn:hover { border-color: var(--accent-warm); background: rgba(226,84,46,.045); }
+  #pasteWrap { margin-top: 14px; padding: 13px 13px 12px; border: 1px solid var(--accent-bd); border-left: 3px solid var(--accent-warm); border-radius: 10px; background: rgba(226,84,46,.045); }
+  #pasteWrap .own-lbl { color: var(--accent-warm); }
+  .run .ex-tag { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; font-weight: 600; color: var(--ink-faint); border: 1px solid var(--hairline); border-radius: 4px; padding: 1px 5px; }
   .btn-paste { font-family: var(--body); font-size: 12.5px; font-weight: 600; color: #fff; background: var(--ink); border: none; border-radius: 8px; padding: 9px 14px; cursor: pointer; transition: background .12s var(--ease-out); }
   .btn-paste:hover { background: #23273A; }
 
@@ -854,14 +891,14 @@ run_quality            <span class="fail"><span id="howRun">15.25</span>  red</s
       <div class="eyebrow"><span class="n">04</span>&thinsp;/&thinsp;WHERE YOU USE IT</div>
       <h2>Two front doors, one engine.</h2>
       <p class="lead">Wire Judix in once. Every turn and every answer is scored live, automatically. Your users write nothing.</p>
-      <div class="where">
-        <div class="where-col">
+      <div class="usewrap">
+        <div class="use-block">
           <div class="hd">IN YOUR APP</div>
           <h3>An HTTP call your agent makes.</h3>
-          <p class="api-intro"><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Any language, any framework.</p>
-          <div class="panel api-panel">
-            <div class="api-step">
-              <div class="api-lbl"><span class="n">a</span>WIRE IT ONCE</div>
+          <p><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Any language, any framework.</p>
+          <div class="steps-3">
+            <div class="step-card">
+              <div class="api-lbl"><span class="n">1</span>WIRE IT ONCE</div>
 <pre><span class="cm"># Python SDK, one hook, every turn scored live</span>
 <span class="k">from</span> judix <span class="k">import</span> JudixCallback
 judge = <span class="v">JudixCallback</span>(goal, expected_tools=[<span class="s">..</span>])
@@ -873,8 +910,8 @@ curl -N -X POST <span class="a">/score/agent/stream</span> \
 curl -N -X POST <span class="a">/score/rag/stream</span> \
   --data <span class="s">@triple.json</span></pre>
             </div>
-            <div class="api-step">
-              <div class="api-lbl"><span class="n">b</span>GET BACK</div>
+            <div class="step-card">
+              <div class="api-lbl"><span class="n">2</span>GET BACK</div>
 <pre><span class="cm">event: deterministic</span>
 data: {
   <span class="k">"run_quality":</span> <span class="viol" id="apiRun">15.25</span>,
@@ -892,8 +929,8 @@ data: {
 <span class="cm">        "unsupported_spans": [</span>
 <span class="cm">          {"start":0,"end":68,"contradicted":true} ] }</span></pre>
             </div>
-            <div class="api-step">
-              <div class="api-lbl"><span class="n">c</span>ACT ON THE ACTION</div>
+            <div class="step-card">
+              <div class="api-lbl"><span class="n">3</span>ACT ON THE ACTION</div>
 <pre><span class="cm"># the SDK derives pass / flag / block</span>
 <span class="cm"># block: quality &lt; 50 or a cap fired</span>
 <span class="cm"># (loop, tool-call, or a contradiction)</span>
@@ -903,16 +940,32 @@ data: {
           </div>
         </div>
 
-        <div class="where-col">
+        <div class="use-block">
           <div class="hd">IN THE PLAYGROUND</div>
           <h3>Click a real demo. Paste your own trace. Watch it scored live.</h3>
-          <div class="light-panel">
-            <div class="row"><span class="num">01</span><span class="txt">Pick a run (<b>clean</b>, <b>wrong_tool</b>, <b>rag_hallucination</b>), or paste any trace.</span></div>
-            <div class="row"><span class="num">02</span><span class="txt">Rust paints the deterministic report in ~1ms. Watch it land first.</span></div>
-            <div class="row"><span class="num">03</span><span class="txt">Model narration streams in, per step, in completion order.</span></div>
-            <div class="row"><span class="num">04</span><span class="txt">Click any step to inspect its call, its metrics, and the reason.</span></div>
-            <div class="cta"><a class="btn-primary" href="#/play"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a></div>
+          <div class="steps-visual">
+            <div class="pstep">
+              <div class="pnum">01</div>
+              <div class="ptext">Pick a run, or paste your own trace.</div>
+              <div class="pvis"><div class="mini-runs"><span class="mp on">wrong_tool</span><span class="mp">clean</span><span class="mp">rag</span></div></div>
+            </div>
+            <div class="pstep">
+              <div class="pnum">02</div>
+              <div class="ptext">Rust paints the deterministic verdict in ~1ms.</div>
+              <div class="pvis"><div class="mini-verdict"><span class="mv-n" id="miniRun">15</span><span class="mv-m">RED&thinsp;&middot;&thinsp;$0&thinsp;&middot;&thinsp;1ms</span></div></div>
+            </div>
+            <div class="pstep">
+              <div class="pnum">03</div>
+              <div class="ptext">Model narration streams in, per step.</div>
+              <div class="pvis"><div class="mini-model"><span class="mtag">MODEL</span>searched downtown, but the goal said avoid it</div></div>
+            </div>
+            <div class="pstep">
+              <div class="pnum">04</div>
+              <div class="ptext">Click any step to see its call, metrics, and reason.</div>
+              <div class="pvis"><div class="mini-detail">search_restaurants<span class="mfail">F1 0.42 &middot; FAIL</span></div></div>
+            </div>
           </div>
+          <div class="cta"><a class="btn-primary" href="#/play"><i class="ph ph-play-circle" style="font-size:18px"></i>Open the playground</a></div>
         </div>
         <div class="where-tail">Same engine, two front doors. No key needed for agent scoring.</div>
       </div>
@@ -1031,12 +1084,12 @@ data: {
 
     <div class="grid cockpit">
       <aside class="col rail">
-        <div class="sec-lbl">RUNS</div>
+        <div class="sec-lbl">EXAMPLE RUNS</div>
         <div id="runs"></div>
-        <button class="rail-btn" id="scoreOwnBtn" type="button"><i class="ph ph-code"></i>Score your own</button>
+        <button class="rail-btn" id="scoreOwnBtn" type="button"><i class="ph ph-code"></i>Score your own trace</button>
         <a class="rail-link" id="savedLink" href="javascript:void(0)"><i class="ph ph-bookmark-simple"></i>Saved tests</a>
         <div class="paste" id="pasteWrap" hidden>
-          <div class="sec-lbl">PASTE A TRACE OR A RAG TRIPLE</div>
+          <div class="sec-lbl own-lbl">YOUR OWN TRACE OR RAG TRIPLE</div>
           <textarea id="input" spellcheck="false" placeholder='Agent trace {"goal":"...","steps":[...],"expected_tools":[...]} or RAG {"question":"...","contexts":[...],"answer":"..."}'></textarea>
           <div class="go"><button class="btn-paste" id="pasteBtn">Score pasted JSON</button></div>
         </div>
@@ -1113,7 +1166,13 @@ data: {
     const onPlay = h === '#/play' || h.indexOf('#/play/') === 0;
     $('view-landing').style.display = onPlay ? 'none' : '';
     $('view-playground').style.display = onPlay ? '' : 'none';
-    if (!onPlay) return;
+    if (!onPlay) {
+      const id = h.length > 1 ? h.slice(1) : '';
+      const el = id && document.getElementById(id);
+      if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      else window.scrollTo(0, 0);
+      return;
+    }
     const kind = h === '#/play/agent' ? 'agent' : h === '#/play/rag' ? 'rag' : null;
     $('play-chooser').style.display = kind ? 'none' : '';
     $('play-cockpit').style.display = kind ? '' : 'none';
@@ -1852,6 +1911,7 @@ data: {
 
     setText('downtownRun', runInt);
     setText('etFinal', runInt);
+    setText('miniRun', runInt);
     setText('howSteps', stepScores.join('  '));
     setText('howRun', runFine);
     setText('howRunBig', runFine);
