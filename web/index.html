@@ -704,6 +704,23 @@
   @keyframes barGrow { from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
   @keyframes sqPop { 0%{ opacity:.15; transform:scale(.6); } 60%{ transform:scale(1.15); } 100%{ opacity:1; transform:scale(1); } }
   @media (prefers-reduced-motion: reduce) { .dc-anim, [style*="animation:blink"], [style*="animation:pulseRed"] { animation: none !important; } }
+  /* ---- interaction layer: hover-lift on cards, press on CTAs, scroll reveal ---- */
+  .rcard { transition: transform .18s var(--ease-out), box-shadow .2s var(--ease-out), border-color .18s var(--ease-out); will-change: transform; }
+  .rcard:hover { transform: translateY(-4px); box-shadow: 0 34px 66px -30px rgba(38,32,26,.5); }
+  .rcard.dark:hover { box-shadow: 0 40px 80px -34px rgba(20,16,12,.7); }
+  .rcta { transition: transform .13s var(--ease-out), filter .13s var(--ease-out), box-shadow .13s var(--ease-out); }
+  .rcta:hover { transform: translateY(-2px); filter: brightness(1.06) saturate(1.05); box-shadow: 0 18px 36px -12px rgba(192,83,43,.75); }
+  .rcta:active { transform: translateY(0) scale(.985); filter: brightness(.97); }
+  .rrow { transition: background .14s var(--ease-out); }
+  .rrow:hover { background: rgba(192,83,43,.035) !important; }
+  #copyBtn { transition: color .14s var(--ease-out), background .14s var(--ease-out); }
+  #copyBtn:hover { color: var(--accent-warm) !important; background: rgba(192,83,43,.06); }
+  [data-reveal] { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
+  [data-reveal].in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .rcard:hover, .rcta:hover, .rcta:active { transform: none; box-shadow: none; filter: none; }
+    [data-reveal] { opacity: 1 !important; transform: none !important; transition: none; }
+  }
   .chip-in { animation: chip-in .22s var(--ease-out) both; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .06ms !important; }
@@ -1108,15 +1125,19 @@
   function setInstall(k) {
     installKind = k;
     document.querySelectorAll('[data-inst]').forEach(b => b.setAttribute('aria-selected', b.dataset.inst === k));
-    $('instCmd').textContent = INSTALL[k];
-    const cb = $('copyBtn'); cb.classList.remove('ok'); cb.querySelector('span').textContent = 'copy';
+    const ic = $('instCmd'); if (ic) ic.textContent = INSTALL[k];
   }
   document.querySelectorAll('[data-inst]').forEach(b => b.addEventListener('click', () => setInstall(b.dataset.inst)));
-  $('copyBtn').addEventListener('click', async () => {
-    const cb = $('copyBtn');
-    try { await navigator.clipboard.writeText(INSTALL[installKind]); cb.classList.add('ok'); cb.querySelector('span').textContent = 'copied'; setTimeout(() => { cb.classList.remove('ok'); cb.querySelector('span').textContent = 'copy'; }, 1600); }
-    catch (e) { cb.querySelector('span').textContent = 'select and copy'; }
-  });
+  // Copy button: the install chip is a single <span id="copyBtn">copy</span>, so set its
+  // own text directly and flash "copied" for 1.6s.
+  (function(){
+    const cb = $('copyBtn'); if (!cb) return;
+    cb.addEventListener('click', async () => {
+      const done = (txt, col) => { cb.textContent = txt; cb.style.color = col; setTimeout(() => { cb.textContent = 'copy'; cb.style.color = ''; }, 1600); };
+      try { await navigator.clipboard.writeText(INSTALL[installKind]); done('copied ✓', 'var(--green-2)'); }
+      catch (e) { done('select + copy', ''); }
+    });
+  })();
 
   /* ============================= LANDING: hero panel (handoff, count-up + replay) ============================= */
   function animateHeroCounts() {
@@ -1867,6 +1888,31 @@
     new IntersectionObserver(([e]) => {
       nav.classList.toggle('scrolled', !e.isIntersecting);
     }, { threshold: 0 }).observe(sentinel);
+  })();
+
+  /* Interaction layer: the design markup is inline-styled (no :hover possible), so tag the
+     cards / CTAs / table rows at runtime and let CSS do hover-lift, press, and scroll reveal. */
+  (function(){
+    const host = document.getElementById('view-landing'); if (!host) return;
+    // Cards: leaf elements with a card-like shadow + radius get the hover-lift.
+    host.querySelectorAll('[style*="box-shadow"]').forEach(el => {
+      const st = el.getAttribute('style') || '';
+      const cardish = /border-radius:1[3-8]px/.test(st) && /box-shadow:0 (1[4-9]|2[0-6])px/.test(st);
+      const leaf = el.querySelectorAll('[style*="box-shadow"]').length === 0;
+      if (cardish && leaf) { el.classList.add('rcard'); if (/background:#211E1B/.test(st)) el.classList.add('dark'); }
+    });
+    // Primary CTAs (rust buttons) get hover + press.
+    host.querySelectorAll('a[style*="background:#C0532B"]').forEach(el => el.classList.add('rcta'));
+    // Compare table body rows get a hover tint.
+    host.querySelectorAll('#compare [style*="grid-template-columns:1.3fr 1fr 1fr"]').forEach((el, i) => { if (i > 0) el.classList.add('rrow'); });
+    // Scroll reveal: fade + rise each section as it enters; reveal above-the-fold at once.
+    if (MOTION && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((ents) => ents.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.08 });
+      host.querySelectorAll('section').forEach(s => {
+        s.setAttribute('data-reveal', '');
+        if (s.getBoundingClientRect().top < innerHeight * 0.9) s.classList.add('in'); else io.observe(s);
+      });
+    }
   })();
 
   window.addEventListener('hashchange', applyRoute);
