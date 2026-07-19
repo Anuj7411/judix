@@ -722,6 +722,10 @@
   #copyBtn:hover { color: var(--accent-warm) !important; background: rgba(192,83,43,.06); }
   [data-reveal] { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
   [data-reveal].in { opacity: 1; transform: none; }
+  #heroReplay { transition: border-color .14s var(--ease-out), color .14s var(--ease-out); }
+  #heroReplay:hover { border-color: rgba(255,255,255,.42) !important; color: #EDE9E1 !important; }
+  #view-landing a[style*="JetBrains Mono"] { transition: color .14s var(--ease-out); }
+  #view-landing a[style*="JetBrains Mono"]:hover { color: var(--accent-warm) !important; }
   @media (prefers-reduced-motion: reduce) {
     .rcard:hover, .rcta:hover, .rcta:active { transform: none; box-shadow: none; filter: none; }
     [data-reveal] { opacity: 1 !important; transform: none !important; transition: none; }
