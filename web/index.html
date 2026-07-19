@@ -315,6 +315,20 @@
   .where-tail { margin-top: 4px; text-align: center; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink-faint); }
   @media (max-width: 560px) { .steps-3, .steps-visual { grid-template-columns: 1fr; } }
 
+  /* flywheel showcase */
+  .fly-flow { margin-top: 36px; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 14px; align-items: stretch; }
+  @media (max-width: 860px) { .fly-flow { grid-template-columns: 1fr; gap: 12px; } .fly-arrow { transform: rotate(90deg); justify-self: center; } }
+  .fly-step { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); display: flex; flex-direction: column; overflow: hidden; }
+  .fly-hd { display: flex; align-items: baseline; gap: 10px; padding: 15px 16px; font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+  .fly-hd .fly-n { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent-warm); }
+  .fly-vis { margin-top: auto; padding: 14px 16px; border-top: 1px solid var(--panel-line); background: var(--panel); color: var(--on-panel); min-height: 62px; display: flex; align-items: center; }
+  .fly-arrow { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 20px; }
+  .mini-saved { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mini-saved .ms { font-family: var(--mono); font-size: 10px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--panel-line); color: var(--on-panel-muted); }
+  .mini-saved .ms.add { border-color: var(--accent-warm); color: var(--accent-warm); }
+  .mini-runall { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--on-panel-muted); }
+  .mini-runall i { color: var(--green); font-size: 16px; }
+
   /* dark cta strip (replaces yellow) */
   .cta-dark { border-top: 1px solid var(--hairline); background: var(--paper-2); }
   .cta-dark-in { max-width: 1200px; margin: 0 auto; padding: 56px 32px; }
@@ -895,7 +909,7 @@ run_quality            <span class="fail"><span id="howRun">15.25</span>  red</s
         <div class="use-block">
           <div class="hd">IN YOUR APP</div>
           <h3>An HTTP call your agent makes.</h3>
-          <p><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Any language, any framework.</p>
+          <p><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Works with LangChain, CrewAI, the OpenAI Agents SDK, or your own loop, in any language.</p>
           <div class="steps-3">
             <div class="step-card">
               <div class="api-lbl"><span class="n">1</span>WIRE IT ONCE</div>
@@ -972,6 +986,30 @@ data: {
     </div>
   </section>
 
+  <section class="band" id="flywheel-showcase">
+    <div class="band-in">
+      <div class="eyebrow"><span class="n">05</span>&thinsp;/&thinsp;THE FLYWHEEL</div>
+      <h2>Every failure it catches becomes a test.</h2>
+      <p class="lead">Judix scores every turn, so it knows exactly which runs failed. It turns each one into a regression test automatically. Your eval suite writes itself, from real production failures, for both agents and RAG.</p>
+      <div class="fly-flow">
+        <div class="fly-step">
+          <div class="fly-hd"><span class="fly-n">01</span>Judix catches a bad run, live</div>
+          <div class="fly-vis"><div class="mini-verdict"><span class="mv-n">15</span><span class="mv-m">RED&thinsp;&middot;&thinsp;caught</span></div></div>
+        </div>
+        <div class="fly-arrow"><i class="ph ph-arrow-right"></i></div>
+        <div class="fly-step">
+          <div class="fly-hd"><span class="fly-n">02</span>Save it as a regression test, one click</div>
+          <div class="fly-vis"><div class="mini-saved"><span class="ms">wrong_tool</span><span class="ms">rag_hallucination</span><span class="ms add">+ new</span></div></div>
+        </div>
+        <div class="fly-arrow"><i class="ph ph-arrow-right"></i></div>
+        <div class="fly-step">
+          <div class="fly-hd"><span class="fly-n">03</span>Run all, export to CI, catch it before it ships again</div>
+          <div class="fly-vis"><div class="mini-runall"><i class="ph ph-check-circle"></i>Run all&thinsp;&middot;&thinsp;export JSON</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="cta-dark">
     <div class="cta-dark-in">
       <div class="cta-panel">
@@ -1011,7 +1049,7 @@ data: {
 
   <section class="band" id="compare">
     <div class="band-in">
-      <div class="eyebrow"><span class="n">05</span>&thinsp;/&thinsp;COMPARE</div>
+      <div class="eyebrow"><span class="n">06</span>&thinsp;/&thinsp;COMPARE</div>
       <h2>Offline evals answer last week. Judix answers now.</h2>
       <div class="cmp">
         <div class="r head">
