@@ -430,8 +430,13 @@
   .phase { font-family: var(--mono); font-size: 10px; display: inline-flex; align-items: center; gap: 6px; }
   .phase .d { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
   .tree-b { padding: 7px; }
-  .node { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer; background: transparent; transition: background .12s var(--ease-out); width: 100%; text-align: left; border: none; }
-  .node:hover { background: var(--paper-2); }
+  .node { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer; background: transparent; transition: background .12s var(--ease-out), padding-left .12s var(--ease-out); width: 100%; text-align: left; border: none; }
+  .node:hover { background: var(--paper-2); padding-left: 13px; }
+  /* tactile press on every interactive control */
+  .run:active, .node:active, .sel-card:active, .choose-card:active, .rail-btn:active, .rail-link:active,
+  .grade:active, .savetest:active, .btn-paste:active, .fly-btn:active, .actiontag { transition: transform .09s var(--ease-out); }
+  .run:active, .node:active, .sel-card:active, .choose-card:active, .rail-btn:active,
+  .grade:active, .savetest:active, .btn-paste:active, .fly-btn:active { transform: scale(.975); }
   .node[aria-selected="true"] { background: var(--accent-tint-2); }
   .node .ni { font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); width: 16px; flex: none; }
   .node .nbr { color: var(--ink-faint); font-size: 12px; flex: none; opacity: .5; }
