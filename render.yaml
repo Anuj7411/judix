@@ -36,3 +36,10 @@ services:
       # its uncertainty at exactly 0.5, so the spec's `< 0.5` would never fire.
       - key: JUDIX_ESCALATE_BELOW
         value: "0.6"
+      # Keep a scored input's verdict stable for a full judging day. The engine is
+      # temperature 0 on every model, so a given input scores the same each time; this
+      # just holds that verdict in cache for 24h instead of the 6h default, so the same
+      # trace never re-scores to a slightly different number mid-session. All 9 models
+      # stay in the pool for availability; the cache key is (model, input).
+      - key: JUDIX_CACHE_TTL_SECS
+        value: "86400"
