@@ -509,6 +509,10 @@
 
   .answer { margin: 9px 0 0; font-size: 15px; line-height: 1.85; color: var(--ink); text-wrap: pretty; }
   .hl { border-radius: 3px; padding: 0 1px; position: relative; display: inline-block; }
+  /* disciplined emphasis: bold ink for key phrases, accent only for hero terms */
+  .kb { font-weight: 700; color: var(--ink); }
+  .key { font-weight: 600; color: var(--accent-warm); }
+  .use-cap { margin: 9px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-faint); }
   .hl .wbg { position: absolute; inset: 0; z-index: 0; border-radius: 3px; transform-origin: left; transform: scaleX(1); }
   .hl .tx { position: relative; z-index: 1; }
   .hl.contra { color: var(--red-2); font-weight: 600; }
@@ -721,7 +725,7 @@
       <div>
         <div class="heron"><span class="d"></span>LIVE, RUST CORE, $0 PER SCORE</div>
         <h1 class="lead-h1">Catch the <span class="a">wrong turn</span> before your user does<span class="r">.</span></h1>
-        <p class="lead-h2">Every agent step and RAG answer, <span class="a">scored while it runs</span><span class="r">.</span></p>
+        <p class="lead-h2">Every <span class="key">agent</span> step and <span class="key">RAG</span> answer, <span class="a">scored while it runs</span><span class="r">.</span></p>
         <p class="lead-sub"><b>Judix scores in Rust, at zero cost.</b> A model only explains the why.</p>
         <div class="install">
           <div class="install-hd">
@@ -773,7 +777,7 @@
       <div>
         <div class="eyebrow"><span class="n">01</span>&thinsp;/&thinsp;THE PROBLEM</div>
         <h2>Your agents ship answers nobody checked.</h2>
-        <p class="lead">Observability shows you what happened. It never tells you if the answer was right. So bad steps reach real users, and you hear about it from them.</p>
+        <p class="lead">Observability shows you what happened. It never tells you if the answer was <span class="kb">right</span>. So bad steps reach real users, and you hear about it from them.</p>
         <div class="downtown">
           <div class="lbl">A REAL RUN JUDIX FLAGS IN 4 STEPS</div>
           <p class="quote">The agent was told to book a table for two on Friday, avoiding downtown. It searched <span class="viol">downtown</span> three times, then said "let me try downtown again".</p>
@@ -807,7 +811,7 @@
     <div class="band-in">
       <div class="eyebrow"><span class="n">02</span>&thinsp;/&thinsp;HOW IT WORKS</div>
       <h2>Two passes over every step, on real data.</h2>
-      <p class="lead">Not a mock. The panels below show the actual wrong_tool run, scored by the real engine.</p>
+      <p class="lead">Not a mock. The panels below show the actual wrong_tool run, scored by the <span class="kb">real engine</span>.</p>
       <div class="how">
         <div class="how-col">
           <div class="step-lbl"><span class="n">01</span>THE TRACE</div>
@@ -877,7 +881,7 @@ run_quality            <span class="fail"><span id="howRun">15.25</span>  red</s
     <div class="band-in">
       <div class="eyebrow"><span class="n">03</span>&thinsp;/&thinsp;EVERY TURN</div>
       <h2>Your agent, scored every turn.</h2>
-      <p class="lead">Judix scores every turn as it happens. The moment run_quality drops below 60, you stop the run before the reply is sent.</p>
+      <p class="lead">Judix scores every turn as it happens. The moment run_quality drops below 60, you <span class="kb">stop the run before the reply is sent</span>.</p>
       <div class="panel" style="margin-top:36px">
         <div class="panel-hd">
           <span class="lbl">RUN, <span class="a">WRONG_TOOL</span>, TURN BY TURN</span>
@@ -936,12 +940,13 @@ run_quality            <span class="fail"><span id="howRun">15.25</span>  red</s
     <div class="band-in">
       <div class="eyebrow"><span class="n">04</span>&thinsp;/&thinsp;WHERE YOU USE IT</div>
       <h2>Two front doors, one engine.</h2>
-      <p class="lead">Wire Judix in once. Every turn and every answer is scored live, automatically. Your users write nothing.</p>
+      <p class="lead">Wire Judix in once. Every turn and every answer is scored <span class="kb">live, automatically</span>. Your users write nothing.</p>
       <div class="usewrap">
         <div class="use-block">
           <div class="hd">IN YOUR APP</div>
           <h3>An HTTP call your agent makes.</h3>
-          <p><b>Judix is an HTTP service your agent calls.</b> One request per step or per answer. Works with LangChain, CrewAI, the OpenAI Agents SDK, or your own loop, in any language.</p>
+          <p>Wire Judix into any agent you build, by hand, with <span class="kb">LangChain</span> or <span class="kb">CrewAI</span>, or one you wrote with <span class="kb">Codex</span> or <span class="kb">Claude Code</span>. One line, and <span class="kb">every turn is scored automatically</span>. Your users write nothing.</p>
+          <p class="use-cap">You see it where your agent runs: <span class="kb">live in your terminal</span> as it streams, or in your own UI if you build one.</p>
           <div class="steps-3">
             <div class="step-card">
               <div class="api-lbl"><span class="n">1</span>WIRE IT ONCE</div>
@@ -1022,7 +1027,7 @@ data: {
     <div class="band-in">
       <div class="eyebrow"><span class="n">05</span>&thinsp;/&thinsp;THE FLYWHEEL</div>
       <h2>Every failure it catches becomes a test.</h2>
-      <p class="lead">Judix scores every turn, so it knows exactly which runs failed. It turns each one into a regression test automatically. Your eval suite writes itself, from real production failures, for both agents and RAG.</p>
+      <p class="lead">Judix scores every turn, so it knows exactly which runs failed. It turns each one into a regression test automatically. Your <span class="kb">eval suite writes itself</span>, from real production failures, for both agents and RAG.</p>
       <div class="fly-flow">
         <div class="fly-step">
           <div class="fly-hd"><span class="fly-n">01</span>Judix catches a bad run, live</div>
@@ -1047,7 +1052,7 @@ data: {
       <div class="cta-panel">
         <div>
           <h2>See every claim, grounded or contradicted.</h2>
-          <p>Judix decomposes a RAG answer into atomic claims and grounds each one against the retrieved sources. Averages would hide the one bad claim. Judix caps the score when any claim contradicts the source.</p>
+          <p>Judix decomposes a RAG answer into atomic claims and grounds each one against the retrieved sources. Averages would hide the one bad claim. Judix caps the score when any claim <span class="kb">contradicts</span> the source.</p>
           <div class="cta-actions">
             <a class="grade" href="#/play/rag"><i class="ph ph-play-circle" style="font-size:18px"></i>Grade the RAG demo</a>
             <a class="btn-ghost" href="https://github.com/Anuj7411/judix">Read the spec &rarr;</a>
