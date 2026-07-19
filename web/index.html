@@ -1709,8 +1709,21 @@
     const raw = $('input').value.trim();
     if (!raw) return fail('info', 'Nothing to score', 'Paste an agent trace or a RAG triple as JSON, or pick a run above.');
     let data; try { data = JSON.parse(raw); } catch (e) { return fail('warn', 'Invalid JSON', 'That is not valid JSON: ' + e.message); }
-    const isRag = Array.isArray(data.contexts) && typeof data.answer === 'string';
-    S.runIdx = isRag ? 2 : (Array.isArray(data.steps) ? (data.goal && /avoid|without|no |not /i.test(data.goal) ? 1 : 0) : 1);
+    const looksRag = data && Array.isArray(data.contexts) && typeof data.answer === 'string';
+    const looksAgent = data && Array.isArray(data.steps);
+    const kind = currentKind();
+    // The paste box is bound to the cockpit you are in. Scoring a RAG triple as an agent
+    // (or vice versa) would produce a meaningless number, so reject the mismatch instead.
+    if (kind === 'rag' && !looksRag) {
+      return fail('warn', 'This is not a RAG answer', 'The RAG cockpit scores a triple: {"question":"...","contexts":["..."],"answer":"..."}. What you pasted looks like an agent trace, open the agent cockpit for that.');
+    }
+    if (kind === 'agent' && !looksAgent) {
+      return fail('warn', 'This is not an agent trace', 'The agent cockpit scores a trace: {"goal":"...","steps":[...]}. What you pasted looks like a RAG triple, open the RAG cockpit for that.');
+    }
+    if (!looksRag && !looksAgent) {
+      return fail('warn', 'Unrecognized JSON', 'Paste an agent trace {"goal":"...","steps":[...]} or a RAG triple {"question":"...","contexts":["..."],"answer":"..."}.');
+    }
+    S.runIdx = kind === 'rag' ? 2 : (data.goal && /avoid|without|no |not /i.test(data.goal) ? 1 : 0);
     S.posted = data; S.error = null;
     grade();
   });
