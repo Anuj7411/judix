@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Judix, real-time evals for agents and RAG</title>
 <meta name="description" content="A deterministic Rust engine scores every agent step and RAG claim with zero model calls. A model only explains the why. Watch the Rust verdict land first." />
-<meta name="theme-color" content="#FAFAFA" />
+<meta name="theme-color" content="#FCFBF9" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%23141414'/%3E%3Crect%20x='9'%20y='12'%20width='14'%20height='8'%20rx='2'%20fill='%239A9CA3'/%3E%3C/svg%3E" />
 <meta property="og:title" content="Judix, real-time evals for agents and RAG" />
 <meta property="og:description" content="A deterministic Rust engine scores; a model only explains. Watch the Rust verdict land first." />
@@ -15,74 +15,79 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:ital,wght@0,400..600;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f%5B%5D=cabinet-grotesk@500,600,700,800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
 <style>
   :root {
-    /* paper, pure white per brief */
+    /* warm design system (claude.design handoff). Cards stay white; page is the glowing grid. */
+    --page-base: #FCFBF9;
     --paper: #FFFFFF;
-    --paper-2: #F5F5F4;   /* bone, from Logo System */
-    --paper-3: #EFEDE7;
-    --ink: #0D0D0F;       /* canonical Logo System ink */
-    --ink-muted: #4A4A4E;
-    --ink-faint: #6E6E73;
-    --hairline: #E8E6E1;  /* warm hairline from Logo System */
-    --hairline-soft: #F1EFEA;
-    /* panel, dark instrument */
-    --panel: #14121A;     /* Logo System dark tile */
-    --panel-2: #1B1922;
-    --panel-3: #262230;
-    --panel-line: #262230;
-    --panel-hair: #22222490;
-    --on-panel: #E9E6F0;
-    --on-panel-muted: #A2A4AB;
-    --on-panel-faint: #8A8A90;
-    /* silver, canonical brand chip grey from the Logo System (headings use this too) */
+    --paper-2: #F8F7F4;
+    --paper-3: #F1EEE8;
+    --ink: #2C2925;
+    --ink-muted: #5C554C;
+    --ink-faint: #8A837A;
+    --hairline: #E7E2D9;
+    --hairline-soft: #F1EEE8;
+    /* panel, dark warm */
+    --panel: #211E1B;
+    --panel-2: #2A2723;
+    --panel-3: #181613;
+    --panel-line: #35312B;
+    --panel-hair: #35312B90;
+    --on-panel: #EDE9E1;
+    --on-panel-muted: #A79E92;
+    --on-panel-faint: #8C857B;
+    /* silver, canonical brand chip grey from the Logo System (logo only, unchanged) */
     --silver: #9A9AA0;
-    /* warm complement, primary CTA + link hover per new brief */
-    --accent-warm: #E2542E;
-    /* accent = ink for CTAs where we want black; primary buttons use warm below. */
-    --accent: #0D0D0F;
-    --accent-2: #9A9AA0;
-    --accent-deep: #000000;
-    --accent-tint: rgba(13,13,15,.06);
-    --accent-tint-2: #F5F5F4;
-    --accent-bd: #C8C8CD;
+    /* rust accent */
+    --accent-warm: #C0532B;
+    --accent: #2C2925;
+    --accent-2: #A79E92;
+    --accent-deep: #A8431F;
+    --accent-tint: rgba(192,83,43,.08);
+    --accent-tint-2: #F7F5F1;
+    --accent-bd: #D9CFC2;
     /* status, score only */
-    --green: #34D08A;
-    --amber: #E7A93C;
-    --red: #EF5350;
-    --green-2: #2AA76F; /* darker for light-bg text where AA needs it */
-    --amber-2: #B0741A;
-    --red-2: #C43B39;
-    --green-tint: rgba(52,208,138,.12);
-    --amber-tint: rgba(231,169,60,.12);
-    --red-tint: rgba(239,83,80,.12);
+    --green: #5FB57E;
+    --amber: #C6902F;
+    --red: #C24034;
+    --green-2: #2F7D57;
+    --amber-2: #B58A2A;
+    --red-2: #C24034;
+    --green-tint: #EBF3EE;
+    --amber-tint: #FAF2DF;
+    --red-tint: #FBEDEA;
     /* motion, shape, shadow */
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-    --rp: 14px; /* panel */
+    --rp: 16px; /* panel */
     --rc: 8px;  /* chip */
-    --sh-paper: 0 1px 2px rgba(23,25,34,.05), 0 12px 32px rgba(23,25,34,.06);
-    --sh-panel: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 2px rgba(23,25,34,.08), 0 24px 60px rgba(23,25,34,.18);
+    --sh-paper: 0 1px 2px rgba(38,32,26,.05), 0 24px 60px -36px rgba(38,32,26,.4);
+    --sh-panel: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 2px rgba(20,16,12,.14), 0 40px 80px -34px rgba(20,16,12,.5);
     /* type */
-    --disp: "Cabinet Grotesk", system-ui, sans-serif;
-    --body: "Geist", system-ui, sans-serif;
-    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --disp: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Instrument Sans", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   *,*::before,*::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   html, body { overflow-x: hidden; max-width: 100%; }
   body {
-    margin: 0; background: var(--paper); color: var(--ink);
+    margin: 0; color: var(--ink);
+    background-color: var(--page-base);
+    background-image:
+      radial-gradient(1150px 580px at 50% -4%, #ffffff 0%, rgba(255,255,255,0) 62%),
+      repeating-linear-gradient(90deg, rgba(44,41,37,.03) 0 1px, transparent 1px 46px),
+      repeating-linear-gradient(0deg, rgba(44,41,37,.022) 0 1px, transparent 1px 46px);
+    background-attachment: fixed;
     font-family: var(--body); font-size: 15px; line-height: 1.5;
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-    font-feature-settings: "ss01" on, "ss02" on;
   }
   a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--hairline); text-underline-offset: 3px; }
   a:hover { color: var(--accent-warm); text-decoration-color: var(--accent-warm); }
   /* Per brief: every heading takes the Logo System silver (#9A9AA0). Body stays ink. */
-  h1, h2, h3, h4 { font-family: var(--disp); font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; margin: 0; color: var(--silver); }
+  h1, h2, h3, h4 { font-family: var(--disp); font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; margin: 0; color: var(--ink); }
   button { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
   ::selection { background: rgba(20,20,20,.14); }
@@ -143,7 +148,7 @@
      strong near-black ink so this is the highest-contrast element on the screen. Subtle
      vertical gradient ink to deep graphite for depth without color. Subline stays calm
      mid grey. The trailing period keeps warm as the one accent point. */
-  .lead-h1 { font-family: var(--disp); font-size: clamp(32px, 4.4vw, 50px); line-height: 1.04; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); background: linear-gradient(180deg, #0D0D0F 0%, #2A2A30 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .lead-h1 { font-family: var(--disp); font-size: clamp(38px, 5.2vw, 64px); line-height: 0.97; font-weight: 800; letter-spacing: -0.035em; color: var(--ink); background: linear-gradient(180deg, #2C2925 0%, #4A4038 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
   .lead-h1 .a { color: inherit; -webkit-text-fill-color: inherit; }
   .lead-h1 .r { color: var(--accent-warm); -webkit-text-fill-color: var(--accent-warm); background: none; }
   .lead-h2 { margin-top: 14px; font-family: var(--disp); font-size: clamp(16px, 1.9vw, 20px); line-height: 1.2; font-weight: 600; letter-spacing: -0.018em; color: var(--ink-muted); }
@@ -210,13 +215,13 @@
 
   /* ==================== SECTION BAND ==================== */
   section[id] { scroll-margin-top: 84px; }
-  .band { border-top: 1px solid var(--hairline); background: var(--paper); }
-  .band.alt { background: var(--paper-2); }
+  .band { border-top: 1px solid rgba(0,0,0,.06); background: transparent; }
+  .band.alt { background: rgba(248,247,244,.55); }
   .band-in { max-width: 1200px; margin: 0 auto; padding: 60px 32px; }
   @media (max-width: 960px) { .band-in { padding: 56px 24px; } }
   .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: var(--accent-warm); font-weight: 600; display: inline-flex; align-items: center; gap: 9px; }
   .eyebrow .n { color: var(--ink-faint); }
-  .band h2 { margin: 16px 0 0; font-family: var(--disp); font-size: clamp(24px, 3vw, 34px); line-height: 1.08; font-weight: 700; letter-spacing: -0.028em; }
+  .band h2 { margin: 16px 0 0; font-family: var(--disp); font-size: clamp(28px, 3.6vw, 44px); line-height: 1.05; font-weight: 700; letter-spacing: -0.03em; }
   .band .lead { margin: 18px 0 0; font-size: 16px; line-height: 1.6; color: var(--ink-muted); max-width: 52ch; }
 
   /* problem */
@@ -378,7 +383,7 @@
   .footer .links span { color: #6E7280; }
 
   /* ==================== PLAYGROUND ==================== */
-  .pg-top { border-bottom: 1px solid var(--hairline); background: rgba(246,247,250,.86); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 50; }
+  .pg-top { border-bottom: 1px solid var(--hairline); background: rgba(255,255,255,.72); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 50; }
   .pg-top-in { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .pg-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
   .pg-back { display: flex; align-items: center; gap: 8px; color: var(--ink-muted); font-size: 13.5px; font-weight: 500; }
