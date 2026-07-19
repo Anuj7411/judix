@@ -555,6 +555,38 @@
   .fly-x { flex: none; border: none; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
   .fly-x:hover { color: var(--red-2); }
   /* playground chooser (workstream 2) */
+  /* Selector redesign (handoff frame 3a) */
+  #play-chooser { max-width: 900px; margin: 0 auto; padding-top: 6px; }
+  .sel-lede { max-width: 760px; margin: 0 auto 34px; text-align: center; }
+  .sel-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: #C0532B; font-weight: 600; }
+  .sel-lede h1 { font-family: var(--disp); font-size: clamp(30px, 3.6vw, 42px); line-height: 1.18; font-weight: 700; letter-spacing: -0.02em; margin: 20px 0 0; text-wrap: balance; color: #2C2925; }
+  .sel-lede p { font-family: var(--body); font-size: 16px; line-height: 1.6; color: #6E675E; margin: 16px auto 0; max-width: 560px; }
+  .sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 18px; }
+  @media (max-width: 720px) { .sel-grid { grid-template-columns: 1fr; } }
+  .sel-card { text-align: left; border: 1px solid rgba(0,0,0,.09); border-radius: 16px; background: #fff; padding: 30px 30px 26px; cursor: pointer; box-shadow: 0 20px 44px -26px rgba(38,32,26,.35); transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out); display: flex; flex-direction: column; }
+  .sel-card:hover { transform: translateY(-3px); box-shadow: 0 26px 54px -24px rgba(38,32,26,.42); }
+  .sel-top { display: flex; align-items: center; justify-content: space-between; }
+  .sel-icon { width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .sel-icon.agent { background: #FBEDEA; color: #C24034; }
+  .sel-icon.rag { background: #FAF2DF; color: #B58A2A; }
+  .sel-pill { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .1em; padding: 5px 9px; border-radius: 20px; }
+  .sel-pill.agent { color: #C0532B; background: #FBEDEA; }
+  .sel-pill.rag { color: #B58A2A; background: #FAF2DF; }
+  .sel-title { font-family: var(--disp); font-weight: 700; font-size: 22px; color: #2C2925; margin: 18px 0 0; letter-spacing: -.01em; }
+  .sel-desc { font-family: var(--body); font-size: 14px; line-height: 1.55; color: #6E675E; margin: 8px 0 0; }
+  .sel-strip { margin: 18px 0 0; background: #F7F5F1; border-radius: 11px; padding: 16px; display: flex; align-items: center; gap: 16px; }
+  .sel-score { font-family: var(--disp); font-weight: 800; font-size: 40px; line-height: 1; letter-spacing: -.02em; color: #C24034; font-variant-numeric: tabular-nums; }
+  .sel-strip-r { flex: 1; min-width: 0; }
+  .sel-bar { height: 6px; border-radius: 6px; background: rgba(0,0,0,.08); overflow: hidden; }
+  .sel-bar span { display: block; height: 100%; background: #C24034; border-radius: 6px; }
+  .sel-claims { display: flex; gap: 4px; }
+  .sel-claims span { height: 6px; flex: 1; border-radius: 6px; }
+  .sel-claims .red { background: #C24034; }
+  .sel-claims .green { background: #5FB57E; }
+  .sel-cap { font-family: var(--mono); font-size: 10.5px; color: #8A837A; margin-top: 9px; letter-spacing: .02em; }
+  .sel-go { font-family: var(--mono); font-weight: 600; font-size: 13px; color: #C0532B; margin-top: 20px; display: inline-flex; align-items: center; gap: 6px; transition: gap .14s var(--ease-out); }
+  .sel-card:hover .sel-go { gap: 9px; }
+
   .chooser { border: 1px solid var(--hairline); border-radius: var(--rp); background: #fff; box-shadow: var(--sh-paper); padding: 8px; display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
   .choose-card { flex: 1; min-width: 220px; text-align: left; border: 1px solid var(--hairline); border-radius: 10px; background: var(--paper-2); padding: 14px 15px; cursor: pointer; transition: border-color .14s var(--ease-out), transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
   .choose-card:hover { border-color: var(--accent-bd); transform: translateY(-2px); box-shadow: var(--sh-paper); }
@@ -1097,22 +1129,43 @@ data: {
 
   <div class="pg-wrap">
     <div id="play-chooser">
-    <div class="pg-lede">
-      <div class="pg-eyebrow">WHAT DO YOU WANT TO EVALUATE?</div>
+    <div class="sel-lede">
+      <div class="sel-eyebrow">WHAT DO YOU WANT TO EVALUATE?</div>
       <h1>Watch Judix grade an AI system live, one turn at a time, before your user ever sees the mistake.</h1>
-      <p>Pick a side. A live example runs and is scored as it streams, deterministic verdict first, model reason after. Click any turn or claim to see the evidence.</p>
+      <p>Pick a side. A real example runs and is scored as it streams, the deterministic verdict lands first, the model reason after. Click any turn or claim for the evidence.</p>
     </div>
-
-    <div class="chooser" id="chooser">
-      <button class="choose-card" data-choose="agent" aria-selected="true">
-        <div class="ct"><i class="ph ph-robot"></i>Score an AI agent</div>
-        <div class="cd">Catch the wrong tool, the loop, and the drift as the agent runs, before the reply is sent.</div>
-        <div class="cgo">Open the agent cockpit <i class="ph ph-arrow-right"></i></div>
+    <div class="sel-grid" id="chooser">
+      <button class="sel-card" data-choose="agent">
+        <div class="sel-top">
+          <div class="sel-icon agent"><i class="ph ph-robot"></i></div>
+          <div class="sel-pill agent">DEMO: WRONG_TOOL</div>
+        </div>
+        <div class="sel-title">Score an AI agent</div>
+        <div class="sel-desc">Catch the wrong tool, the loop, and the drift as the agent runs, before the reply is sent.</div>
+        <div class="sel-strip">
+          <div class="sel-score">15</div>
+          <div class="sel-strip-r">
+            <div class="sel-bar"><span style="width:15%"></span></div>
+            <div class="sel-cap">run_quality &middot; caught at turn 2</div>
+          </div>
+        </div>
+        <div class="sel-go">Open the agent cockpit <i class="ph ph-arrow-right"></i></div>
       </button>
-      <button class="choose-card" data-choose="rag" aria-selected="false">
-        <div class="ct"><i class="ph ph-quotes"></i>Score a RAG answer</div>
-        <div class="cd">Catch the hallucination, claim by claim, against the sources, before the user reads it.</div>
-        <div class="cgo">Open the RAG cockpit <i class="ph ph-arrow-right"></i></div>
+      <button class="sel-card" data-choose="rag">
+        <div class="sel-top">
+          <div class="sel-icon rag"><i class="ph ph-quotes"></i></div>
+          <div class="sel-pill rag">DEMO: HALLUCINATION</div>
+        </div>
+        <div class="sel-title">Score a RAG answer</div>
+        <div class="sel-desc">Catch the hallucination, claim by claim, against the sources, before the user reads it.</div>
+        <div class="sel-strip">
+          <div class="sel-score">49</div>
+          <div class="sel-strip-r">
+            <div class="sel-claims"><span class="red"></span><span class="green"></span><span class="green"></span></div>
+            <div class="sel-cap">rag_quality &middot; 1 of 3 claims contradicts</div>
+          </div>
+        </div>
+        <div class="sel-go">Open the RAG cockpit <i class="ph ph-arrow-right"></i></div>
       </button>
     </div>
     </div><!-- /play-chooser -->
