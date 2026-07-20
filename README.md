@@ -147,12 +147,12 @@ The model layer is any **OpenAI-compatible** chat API. Two independent providers
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `JUDIX_BASE_URL` | *(required to enable)* | fast provider base URL, e.g. `https://generativelanguage.googleapis.com/v1beta/openai` |
-| `JUDIX_API_KEY` | *(required to enable)* | fast provider key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey), free, no card) |
-| `JUDIX_MODEL_FAST` | `gemini-flash-latest` | primary judge model (`gemini-3.1-flash-lite` recommended) |
-| `JUDIX_STRONG_BASE_URL` | falls back to `JUDIX_BASE_URL` | strong provider base URL, e.g. `https://api.groq.com/openai/v1` |
-| `JUDIX_STRONG_API_KEY` | falls back to `JUDIX_API_KEY` | strong provider key ([console.groq.com](https://console.groq.com), free, no card) |
-| `JUDIX_MODEL_STRONG` | `llama-3.3-70b-versatile` | escalation model |
+| `JUDIX_BASE_URL` | *(required to enable)* | fast provider base URL — any OpenAI-compatible `/v1` chat endpoint |
+| `JUDIX_API_KEY` | *(required to enable)* | fast provider API key |
+| `JUDIX_MODEL_FAST` | *(provider default)* | primary judge model — a small, fast model |
+| `JUDIX_STRONG_BASE_URL` | falls back to `JUDIX_BASE_URL` | strong provider base URL |
+| `JUDIX_STRONG_API_KEY` | falls back to `JUDIX_API_KEY` | strong provider API key |
+| `JUDIX_MODEL_STRONG` | *(provider default)* | escalation model — a larger model |
 | `JUDIX_AUTO_EXPAND` | `1` | auto-expand each key into all its provider's free models (`0` disables) |
 | `JUDIX_EXTRA_PROVIDERS` | *(none)* | JSON array of extra failover endpoints — see the pool section |
 | `JUDIX_ESCALATE_BELOW` | `0.6` | re-run a check on the strong model below this confidence |
@@ -165,8 +165,8 @@ The model layer is any **OpenAI-compatible** chat API. Two independent providers
 not to sleep — `chat()` fails over instantly and only backs off when both are busy. It also means a
 low-confidence check gets a genuine second opinion instead of re-asking the model that was unsure.
 
-**Why `0.6` and not `0.5`.** Judges are chronically overconfident: Gemini floors its uncertainty at
-*exactly* `0.5` and never dips below, so a literal `< 0.5` threshold never fires and the strong model
+**Why `0.6` and not `0.5`.** Judge models are chronically overconfident: some floor their uncertainty at
+*exactly* `0.5` and never dip below, so a literal `< 0.5` threshold never fires and the strong model
 is never consulted. `0.6` catches that signal and leaves confident (0.7–1.0) calls alone.
 
 ---
@@ -200,28 +200,21 @@ GitHub Actions keep-warm ping so judges don't hit a cold start.
 
 ## The model provider pool (why quotas don't take Judix down)
 
-Free tiers are **metered per model, not per account** — Gemini's own 429 says
-`GenerateRequestsPerDayPerProjectPerModel-FreeTier`. Measured, with one Gemini key and
-one Groq key, at a moment when the two headline models were fully exhausted:
+Free tiers are **metered per model, not per account** — a provider's rate-limit `429` is
+scoped to a *single model on a single project*, not the whole key. Measured with two
+independent provider keys, at a moment when both headline models were fully exhausted, several
+*sibling* models on the same two endpoints still answered `200` on their own separate quotas.
 
-| Endpoint | Status at that moment |
-|---|---|
-| `gemini-3.1-flash-lite` | ❌ 429 — day's quota gone |
-| `gemini-2.5-flash` | ✅ 200 — **its own quota** |
-| `gemini-flash-latest` | ✅ 200 — **its own quota** |
-| `llama-3.3-70b-versatile` | ❌ 429 — day's tokens gone |
-| `llama-3.1-8b-instant` | ✅ 200 — **its own quota** |
-| `openai/gpt-oss-120b` | ✅ 200 — **its own quota** |
-
-So capacity comes from the keys you already have. Set the two — a Gemini key and a Groq
-key — and the pool **auto-expands** to every free model on each endpoint (Gemini and Groq
-each contribute ~4-5 models, ~9 endpoints total). No extra config, nothing fragile to
-paste. `JUDIX_EXTRA_PROVIDERS` (a JSON array of `{base_url, api_key, model}`) can add more
-endpoints for other providers; `JUDIX_AUTO_EXPAND=0` turns expansion off. The pool is
-`[fast, strong, ...auto-expanded siblings, ...extras]`, deduped, and shown on `/health`. On a `429` a call fails over to the next healthy endpoint, and a throttled one is
-put in a 45s cooldown so it stops being tried first. Verified end-to-end on a day when
-both primaries were dead: `wrong_tool → 20.6 red`, `rag → 49.0 red`, cascading
-`gemini-2.5-flash → … → openai/gpt-oss-120b`.
+So capacity comes from the keys you already have. Set the two — a fast provider key and a
+strong provider key — and the pool **auto-expands** to every free model each key exposes on its
+endpoint (about nine models total across the two). No extra config, nothing fragile to paste.
+`JUDIX_EXTRA_PROVIDERS` (a JSON array of `{base_url, api_key, model}`) can add more endpoints for
+any other OpenAI-compatible provider; `JUDIX_AUTO_EXPAND=0` turns expansion off. The pool is
+`[fast, strong, ...auto-expanded siblings, ...extras]`, deduped, and shown on `/health`. On a
+`429` a call fails over to the next healthy endpoint, and a throttled one is put in a 45s
+cooldown so it stops being tried first. Verified end-to-end on a day when both primaries were
+dead: `wrong_tool -> 20.6 red`, `rag -> 49.0 red`, cascading across the surviving models until
+one answered.
 
 **The floor underneath all of it:** the deterministic engine needs no quota, no key and no
 network. With every provider exhausted, unseen data still scored **47.7 red at
@@ -229,12 +222,12 @@ network. With every provider exhausted, unseen data still scored **47.7 red at
 LLM-judge returns nothing in that state; Judix degrades to "less explanation", never to
 "no answer".
 
-**Token budget matters more than request count.** Providers reserve `max_tokens` against
-your quota whether you use it or not (Groq's 429: prompt 116 + `max_tokens` 2048 =
-`"Requested 2164"`), so a blanket 2048 was burning ~93% of a 100k/day tier to receive
-~50-token replies. Budgets are now sized per check, `goal_drift` sees a bounded
-[8-step window] instead of the whole prefix (which made prompt cost O(n²) in trace
-length), and both per-step judgements share one call.
+**Token budget matters more than request count.** Providers reserve `max_tokens` against your
+quota whether you use it or not (a real `429` read `prompt 116 + max_tokens 2048 =
+"Requested 2164"`), so a blanket 2048 was burning ~93% of a 100k/day tier to receive ~50-token
+replies. Budgets are now sized per check, `goal_drift` sees a bounded [8-step window] instead
+of the whole prefix (which made prompt cost O(n^2) in trace length), and both per-step
+judgements share one call.
 
 ## Security
 
