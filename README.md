@@ -84,8 +84,8 @@ cargo test -p judix-core
 cargo run -p judix-server        # then: curl localhost:8000/health
 ```
 
-To enable the model layer, set the env vars below and restart. `GET /health` reports
-`"model_layer": "enabled"` once it's live.
+To enable the model layer, set `JUDIX_BASE_URL` and `JUDIX_API_KEY` to any OpenAI-compatible
+provider and restart. `GET /health` reports `"model_layer": "enabled"` once it's live.
 
 ### Demos (`demos/`)
 - `clean.json` — books a table correctly, avoiding downtown → Run Quality ~100 (green).
@@ -137,37 +137,6 @@ curl -N -X POST http://localhost:8000/score/agent/stream \
 
 > **Client note:** browsers cannot `POST` with `EventSource`, so consume these with
 > `fetch()` + a `ReadableStream` reader — not `new EventSource(...)`.
-
----
-
-## Configuration
-
-The model layer is any **OpenAI-compatible** chat API. Two independent providers are used: a
-**fast** primary judge and a **strong** secondary. The deterministic engine needs no key and runs at $0.
-
-| Env var | Default | Purpose |
-|---|---|---|
-| `JUDIX_BASE_URL` | *(required to enable)* | fast provider base URL — any OpenAI-compatible `/v1` chat endpoint |
-| `JUDIX_API_KEY` | *(required to enable)* | fast provider API key |
-| `JUDIX_MODEL_FAST` | *(provider default)* | primary judge model — a small, fast model |
-| `JUDIX_STRONG_BASE_URL` | falls back to `JUDIX_BASE_URL` | strong provider base URL |
-| `JUDIX_STRONG_API_KEY` | falls back to `JUDIX_API_KEY` | strong provider API key |
-| `JUDIX_MODEL_STRONG` | *(provider default)* | escalation model — a larger model |
-| `JUDIX_AUTO_EXPAND` | `1` | auto-expand each key into all its provider's free models (`0` disables) |
-| `JUDIX_EXTRA_PROVIDERS` | *(none)* | JSON array of extra failover endpoints — see the pool section |
-| `JUDIX_ESCALATE_BELOW` | `0.6` | re-run a check on the strong model below this confidence |
-| `JUDIX_RATE_LIMIT_PER_MIN` | `20` | per-IP cap on `/score/*` requests before `429` |
-| `JUDIX_MAX_MODEL_STEPS` | `40` | max steps per request that get **model** checks (see Security) |
-| `JUDIX_CACHE_TTL_SECS` | `21600` | response-cache TTL |
-| `PORT` | `8000` | listen port (hosts inject this) |
-
-**Why two providers.** They hold independent quotas, so a `429` on one is a reason to *use the other*,
-not to sleep — `chat()` fails over instantly and only backs off when both are busy. It also means a
-low-confidence check gets a genuine second opinion instead of re-asking the model that was unsure.
-
-**Why `0.6` and not `0.5`.** Judge models are chronically overconfident: some floor their uncertainty at
-*exactly* `0.5` and never dip below, so a literal `< 0.5` threshold never fires and the strong model
-is never consulted. `0.6` catches that signal and leaves confident (0.7–1.0) calls alone.
 
 ---
 
