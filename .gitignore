@@ -2,3 +2,6 @@
 **/*.rs.bk
 .env
 Cargo.lock.orig
+
+# Claude Code local config
+.claude/

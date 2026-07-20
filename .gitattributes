@@ -1,0 +1,8 @@
+# The playground UI is one self-contained file embedded into the Rust binary via
+# include_str! (no build step). It is an asset, not core source, so exclude it
+# from GitHub's language stats -- the repo is a Rust engine.
+web/index.html linguist-vendored
+# SDK examples / scripts are auxiliary, not the engine.
+sdk/**        linguist-vendored
+scripts/**    linguist-vendored
+examples/**   linguist-documentation
