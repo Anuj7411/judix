@@ -78,16 +78,24 @@ Requires Rust (stable).
 # Install the deterministic scorer globally:
 cargo install --git https://github.com/Anuj7411/judix judix-cli
 
-# Then score a real trace with NO local files — pipe a hosted demo straight in:
-curl -s https://judix-8piu.onrender.com/demo/wrong_tool | judix
+# Watch a real run score live in your terminal — no files, no wiring, just:
+judix
 
 # Score your own trace (a JSON file, or piped JSON):
 judix my_trace.json
 echo '{"goal":"book a table, avoid downtown","steps":[...]}' | judix
 
+# Or score a hosted demo with no local files:
+curl -s https://judix-8piu.onrender.com/demo/wrong_tool | judix
+
 # See usage any time:
 judix --help
 ```
+
+> **Judix does not watch your agents on its own** — nothing can; a scorer has to be handed
+> each turn. `judix` (above) *shows* you per-turn scoring on a demo. To score every turn of
+> **your** agent live, wire the one-line SDK hook into it (see `examples/` and the SDK); each
+> turn is then scored the instant it happens, streamed to your terminal or your own UI.
 
 `judix` prints a report with tool-call F1, loop detection, per-step and run quality, and
 the color band — all deterministic, no model, no key, $0. A trace is JSON shaped like
