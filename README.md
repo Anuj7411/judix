@@ -70,7 +70,31 @@ Every metric is 0–100. Deterministic metrics also emit `pass` + the raw value;
 
 ## Quickstart
 
-Requires Rust (stable). From the repo root:
+Requires Rust (stable).
+
+### Install the CLI and score something in one line
+
+```bash
+# Install the deterministic scorer globally:
+cargo install --git https://github.com/Anuj7411/judix judix-cli
+
+# Then score a real trace with NO local files — pipe a hosted demo straight in:
+curl -s https://judix-8piu.onrender.com/demo/wrong_tool | judix
+
+# Score your own trace (a JSON file, or piped JSON):
+judix my_trace.json
+echo '{"goal":"book a table, avoid downtown","steps":[...]}' | judix
+
+# See usage any time:
+judix --help
+```
+
+`judix` prints a report with tool-call F1, loop detection, per-step and run quality, and
+the color band — all deterministic, no model, no key, $0. A trace is JSON shaped like
+`{ "goal": "...", "steps": [ ... ] }`. (RAG triples are model-scored on the server, and
+`judix` tells you so instead of erroring.)
+
+### From the repo (for development)
 
 ```bash
 # Run the deterministic engine over a demo trace (no model, no API key, $0):
