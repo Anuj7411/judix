@@ -1166,7 +1166,22 @@
     pnl.querySelectorAll('[style*="animation:"]').forEach(el => { const a = el.style.animation; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = a; });
     animateHeroCounts();
   }
-  { const hr = $('heroReplay'); if (hr) hr.addEventListener('click', heroReplay); animateHeroCounts(); }
+  {
+    const hr = $('heroReplay'); if (hr) hr.addEventListener('click', heroReplay);
+    const pnl = $('heroPanel');
+    const play = () => MOTION ? heroReplay() : animateHeroCounts();
+    // Keep the card alive: replay its entrance + count-up every time it scrolls
+    // into view (SPA nav back to home included), and loop gently while on screen
+    // so it reads as a live run rather than a frozen screenshot. Paused off-screen
+    // and under prefers-reduced-motion.
+    if (pnl && 'IntersectionObserver' in window) {
+      let loop = null;
+      new IntersectionObserver((ents) => ents.forEach(e => {
+        if (e.isIntersecting) { play(); if (MOTION && !loop) loop = setInterval(heroReplay, 7000); }
+        else if (loop) { clearInterval(loop); loop = null; }
+      }), { threshold: 0.3 }).observe(pnl);
+    } else { play(); }
+  }
 
   /* ============================= PLAYGROUND ============================= */
   async function sseStream(url, body, onEvent) {
