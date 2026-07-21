@@ -99,7 +99,7 @@ provider and restart. `GET /health` reports `"model_layer": "enabled"` once it's
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `GET` | `/` | — | the web playground |
-| `GET` | `/health` | — | `{ok, service, version, model_layer, model_fast, model_pool, commit}` |
+| `GET` | `/health` | — | `{ok, service, version, model_layer, model_pool_size, commit}` |
 | `GET` | `/api` | — | machine-readable endpoint list |
 | `POST` | `/score/agent` | `AgentTrace` | `AgentReport` — `{run_quality, band, steps[], latency_ms, model_cost_usd, deterministic_share}` |
 | `POST` | `/score/rag` | `RagTriple` | `RagReport` — `{rag_quality, band, metrics[], unsupported_spans[], latency_ms, model_cost_usd}` |

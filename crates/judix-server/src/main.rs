@@ -209,10 +209,10 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         "service": "judix",
         "version": env!("CARGO_PKG_VERSION"),
         "model_layer": if state.model.is_some() { "enabled" } else { "disabled (set JUDIX_API_KEY)" },
-        "model_fast": std::env::var("JUDIX_MODEL_FAST").unwrap_or_else(|_| "-".into()),
-        // The failover pool, so a mis-pasted JUDIX_EXTRA_PROVIDERS is visible instead of
-        // silently degrading to two endpoints and all-`na` metrics.
-        "model_pool": state.model.as_ref().map(|m| m.pool_summary()).unwrap_or_default(),
+        // Just the size of the failover pool, not the model names: a mis-pasted
+        // JUDIX_EXTRA_PROVIDERS still shows up as a smaller-than-expected count
+        // (the same silent-degradation signal), without exposing providers publicly.
+        "model_pool_size": state.model.as_ref().map(|m| m.pool_summary().len()).unwrap_or(0),
         // Which commit is ACTUALLY serving traffic. Render injects RENDER_GIT_COMMIT.
         // Without this a stale deploy is invisible — this service silently served a
         // build from ~10 commits back for a full day because nothing reported the
@@ -581,8 +581,12 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let v = body_json(resp).await;
-        for field in ["ok", "service", "version", "model_layer", "model_fast", "model_pool", "commit"] {
+        for field in ["ok", "service", "version", "model_layer", "model_pool_size", "commit"] {
             assert!(v.get(field).is_some(), "/health missing `{field}`: {v}");
+        }
+        // /health must not leak model/provider names publicly.
+        for leaked in ["model_fast", "model_pool"] {
+            assert!(v.get(leaked).is_none(), "/health should not expose `{leaked}`: {v}");
         }
     }
 
