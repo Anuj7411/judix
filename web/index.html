@@ -708,6 +708,7 @@
   @keyframes stepIn { from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
   @keyframes barGrow { from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
   @keyframes sqPop { 0%{ opacity:.15; transform:scale(.6); } 60%{ transform:scale(1.15); } 100%{ opacity:1; transform:scale(1); } }
+  @keyframes hqPulse { 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
   @media (prefers-reduced-motion: reduce) { .dc-anim, [style*="animation:blink"], [style*="animation:pulseRed"] { animation: none !important; } }
   /* ---- interaction layer: hover-lift on cards, press on CTAs, scroll reveal ---- */
   .rcard { transition: transform .18s var(--ease-out), box-shadow .2s var(--ease-out), border-color .18s var(--ease-out); will-change: transform; }
@@ -773,11 +774,11 @@
       <div id="heroPanel" style="background:#211E1B;border-radius:16px;padding:24px 26px;box-shadow:0 40px 80px -34px rgba(20,16,12,.6);color:#EDE9E1;position:relative;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px"><span style="font:600 11px 'JetBrains Mono';letter-spacing:.14em;color:#8C857B">RUN &middot; wrong_tool demo</span><span id="heroReplay" style="font:600 10px 'JetBrains Mono';color:#B3ABA0;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:5px 10px;cursor:pointer">&#8635; REPLAY</span></div>
         <div style="display:flex;align-items:flex-end;gap:26px;margin-bottom:22px;flex-wrap:wrap">
-          <div><div style="font:800 58px 'Bricolage Grotesque';color:#E05A40;line-height:.85" data-countup="15">15</div><div style="font:600 9px 'JetBrains Mono';letter-spacing:.14em;color:#8C857B;margin-top:7px">RUN QUALITY</div></div>
+          <div><div id="hqScore" style="font:800 58px 'Bricolage Grotesque';color:#E05A40;line-height:.85">15</div><div style="font:600 9px 'JetBrains Mono';letter-spacing:.14em;color:#8C857B;margin-top:7px">RUN QUALITY</div></div>
           <div style="display:flex;gap:22px;padding-bottom:4px">
-            <div><div style="font:700 18px 'JetBrains Mono';color:#E05A40" data-countup="0.42" data-dec="2">0.42</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">TOOL F1</div></div>
-            <div><div style="font:700 18px 'JetBrains Mono';color:#E7B94E" data-countup="50">50</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">LOOP</div></div>
-            <div><div style="font:700 18px 'JetBrains Mono';color:#EDE9E1">5/5</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">STEPS</div></div>
+            <div><div id="hqF1" style="font:700 18px 'JetBrains Mono';color:#E05A40">0.42</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">TOOL F1</div></div>
+            <div><div id="hqLoop" style="font:700 18px 'JetBrains Mono';color:#E7B94E">50</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">LOOP</div></div>
+            <div><div id="hqSteps" style="font:700 18px 'JetBrains Mono';color:#EDE9E1">5/5</div><div style="font:600 8px 'JetBrains Mono';letter-spacing:.1em;color:#8C857B;margin-top:4px">STEPS</div></div>
           </div>
           <div style="margin-left:auto;display:flex;gap:5px;align-self:center">
             <span style="width:16px;height:16px;background:#E05A40;border-radius:3px;animation:sqPop .4s both"></span>
@@ -787,13 +788,13 @@
             <span style="width:16px;height:16px;background:#E05A40;border-radius:3px;animation:sqPop .4s .48s both"></span>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:9px">
+        <div id="hqBody" style="display:flex;flex-direction:column;gap:9px">
           <div style="background:#2A2723;border-radius:9px;padding:13px 15px;animation:stepIn .45s .1s both"><div style="display:flex;align-items:center;gap:12px"><span style="font:700 10px 'JetBrains Mono';color:#6E675E">00</span><span style="font:600 13px 'JetBrains Mono';color:#EDE9E1">plan</span><span style="font:700 8px 'JetBrains Mono';color:#8C857B;border:1px solid rgba(255,255,255,.14);padding:2px 6px;border-radius:4px">LLM</span><span style="margin-left:auto;font:700 15px 'JetBrains Mono';color:#EDE9E1">0</span><span style="width:8px;height:8px;background:#5FB57E;border-radius:50%;display:inline-block"></span></div><div style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);font:400 12px 'Instrument Sans';color:#B7AFA4"><b style="color:#E7B94E;font:700 8px 'JetBrains Mono'">WHY&nbsp;&nbsp;</b>The step explicitly violates the constraint to avoid downtown.</div></div>
           <div style="background:#2A2723;border-radius:9px;padding:13px 15px;display:flex;align-items:center;gap:12px;animation:stepIn .45s .32s both"><span style="font:700 10px 'JetBrains Mono';color:#6E675E">01</span><span style="font:600 13px 'JetBrains Mono';color:#EDE9E1">search_restaurants</span><span style="font:700 8px 'JetBrains Mono';color:#8C857B;border:1px solid rgba(255,255,255,.14);padding:2px 6px;border-radius:4px">TOOL</span><span style="margin-left:auto;font:700 15px 'JetBrains Mono';color:#E05A40">33</span><span style="width:8px;height:8px;background:#E05A40;border-radius:50%;display:inline-block"></span></div>
           <div style="background:#2A2723;border-radius:9px;padding:13px 15px;display:flex;align-items:center;gap:12px;animation:stepIn .45s .54s both"><span style="font:700 10px 'JetBrains Mono';color:#6E675E">02</span><span style="font:600 13px 'JetBrains Mono';color:#EDE9E1">search_restaurants</span><span style="font:700 8px 'JetBrains Mono';color:#8C857B;border:1px solid rgba(255,255,255,.14);padding:2px 6px;border-radius:4px">TOOL</span><span style="margin-left:auto;font:700 15px 'JetBrains Mono';color:#E05A40">24</span><span style="width:8px;height:8px;background:#E05A40;border-radius:50%;display:inline-block"></span></div>
           <div style="background:#2A2723;border-radius:9px;padding:13px 15px;display:flex;align-items:center;gap:12px;animation:stepIn .45s .76s both"><span style="font:700 10px 'JetBrains Mono';color:#6E675E">03</span><span style="font:600 13px 'JetBrains Mono';color:#EDE9E1">reply</span><span style="font:700 8px 'JetBrains Mono';color:#8C857B;border:1px solid rgba(255,255,255,.14);padding:2px 6px;border-radius:4px">LLM</span><span style="margin-left:auto;font:700 15px 'JetBrains Mono';color:#EDE9E1">0</span><span style="width:8px;height:8px;background:#5FB57E;border-radius:50%;display:inline-block"></span></div>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:18px;font:500 10px 'JetBrains Mono';color:#6E675E;gap:12px;flex-wrap:wrap"><span>rust caps the failure &middot; a model scores the intent</span><span>capped at 59 &middot; critical fail</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:18px;font:500 10px 'JetBrains Mono';color:#6E675E;gap:12px;flex-wrap:wrap"><span>rust caps the failure &middot; a model scores the intent</span><span id="hqCap">capped at 59 &middot; critical fail</span></div>
       </div>
     </div>
   </section>
@@ -1148,40 +1149,76 @@
     });
   })();
 
-  /* ============================= LANDING: hero panel (handoff, count-up + replay) ============================= */
-  function animateHeroCounts() {
-    document.querySelectorAll('#heroPanel [data-countup]').forEach(el => {
-      const target = parseFloat(el.getAttribute('data-countup'));
-      const dec = parseInt(el.getAttribute('data-dec') || '0', 10);
-      if (!MOTION) { el.textContent = target.toFixed(dec); return; }
-      const dur = 850, start = performance.now();
-      el.textContent = (0).toFixed(dec);
-      (function tick(now){ const t = Math.min(1, (now - start) / dur); const e = 1 - Math.pow(1 - t, 3);
-        el.textContent = (target * e).toFixed(dec); if (t < 1) requestAnimationFrame(tick); else el.textContent = target.toFixed(dec); })(performance.now());
-      setTimeout(() => { el.textContent = target.toFixed(dec); }, dur + 220);
+  /* ===== LANDING: hero cockpit — a continuous LIVE stream of the real wrong_tool run.
+     Data is the actual engine output (GET /demo/wrong_tool -> POST /score/agent):
+     run_quality 14.25 red, capped at 59 by the critical fails. Steps stream in one by
+     one, each score eases up from `..`, RUN QUALITY recomputes live as steps resolve,
+     F1/LOOP/STEPS fill in as their step lands, the running dot pulses, then it holds and
+     loops so the card always reads as a live run. Every number is a real engine output.
+     Loops only while on screen and only with motion enabled. ===== */
+  (function heroStream(){
+    const panel = $('heroPanel'), body = $('hqBody');
+    if (!panel || !body) return;
+    const scoreEl=$('hqScore'), f1El=$('hqF1'), loopEl=$('hqLoop'), stepsEl=$('hqSteps'), capEl=$('hqCap');
+    const RED='#E05A40', AMBER='#E7B94E', GREEN='#5FB57E', INK='#EDE9E1', MUTE='#6E675E';
+    const S=[
+      {idx:'00',name:'plan',              kind:'LLM', sc:0,  band:RED, loop:null, why:'The step explicitly violates the constraint to avoid downtown.'},
+      {idx:'01',name:'search_restaurants',kind:'TOOL',sc:28, band:RED, loop:100},
+      {idx:'02',name:'search_restaurants',kind:'TOOL',sc:24, band:RED, loop:75},
+      {idx:'03',name:'search_restaurants',kind:'TOOL',sc:20, band:RED, loop:50},
+      {idx:'04',name:'reply',             kind:'LLM', sc:0,  band:RED, loop:null},
+    ];
+    const N=S.length, FINAL=14;               // round(run_quality 14.25)
+    body.innerHTML='';                        // replace the static no-JS fallback rows
+    const rows = S.map(d => {
+      const row=document.createElement('div');
+      row.style.cssText="background:#2A2723;border-radius:9px;padding:13px 15px;transition:opacity .3s var(--ease-out)";
+      row.innerHTML=
+        "<div style=\"display:flex;align-items:center;gap:12px\">"+
+          "<span style=\"font:700 10px 'JetBrains Mono';color:#6E675E\">"+d.idx+"</span>"+
+          "<span style=\"font:600 13px 'JetBrains Mono';color:#EDE9E1\">"+d.name+"</span>"+
+          "<span style=\"font:700 8px 'JetBrains Mono';color:#8C857B;border:1px solid rgba(255,255,255,.14);padding:2px 6px;border-radius:4px\">"+d.kind+"</span>"+
+          "<span class=\"hqsc\" style=\"margin-left:auto;font:700 15px 'JetBrains Mono';color:"+MUTE+"\">..</span>"+
+          "<span class=\"hqdot\" style=\"width:8px;height:8px;border-radius:50%;display:inline-block;background:"+MUTE+"\"></span>"+
+        "</div>"+
+        (d.why?"<div class=\"hqwhy\" style=\"margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);font:400 12px 'Instrument Sans';color:#B7AFA4;display:none\"><b style=\"color:#E7B94E;font:700 8px 'JetBrains Mono'\">WHY&nbsp;&nbsp;</b>"+d.why+"</div>":"");
+      row._sc=row.querySelector('.hqsc'); row._dot=row.querySelector('.hqdot'); row._why=row.querySelector('.hqwhy');
+      body.appendChild(row);
+      return row;
     });
-  }
-  function heroReplay() {
-    const pnl = $('heroPanel'); if (!pnl) return;
-    pnl.querySelectorAll('[style*="animation:"]').forEach(el => { const a = el.style.animation; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = a; });
-    animateHeroCounts();
-  }
-  {
-    const hr = $('heroReplay'); if (hr) hr.addEventListener('click', heroReplay);
-    const pnl = $('heroPanel');
-    const play = () => MOTION ? heroReplay() : animateHeroCounts();
-    // Keep the card alive: replay its entrance + count-up every time it scrolls
-    // into view (SPA nav back to home included), and loop gently while on screen
-    // so it reads as a live run rather than a frozen screenshot. Paused off-screen
-    // and under prefers-reduced-motion.
-    if (pnl && 'IntersectionObserver' in window) {
-      let loop = null;
-      new IntersectionObserver((ents) => ents.forEach(e => {
-        if (e.isIntersecting) { play(); if (MOTION && !loop) loop = setInterval(heroReplay, 7000); }
-        else if (loop) { clearInterval(loop); loop = null; }
-      }), { threshold: 0.3 }).observe(pnl);
-    } else { play(); }
-  }
+    const EASE=t=>1-Math.pow(1-t,3);
+    const START=500, GAP=780, ANIM=560, HOLD=3400, CYCLE=START+(N-1)*GAP+ANIM+HOLD;
+    let t0=performance.now(), raf=null;
+    function render(now){
+      const tt=(now-t0)%CYCLE;
+      let resolved=0, sum=0, lastLoop=null, f1On=false;
+      S.forEach((d,i)=>{
+        const st=START+i*GAP, vis=tt>=st, p=vis?Math.min(1,(tt-st)/ANIM):0, done=p>=1, row=rows[i];
+        row.style.opacity=vis?1:.3;
+        const col=!vis?MUTE:(done?d.band:INK);
+        row._sc.textContent=vis?String(Math.round(d.sc*EASE(p))):'..';
+        row._sc.style.color=col;
+        row._dot.style.background=col;
+        row._dot.style.animation=(vis&&!done)?'hqPulse .7s infinite':'none';
+        if(row._why) row._why.style.display=done?'block':'none';
+        if(done){ resolved++; sum+=d.sc; if(d.loop!=null)lastLoop=d.loop; if(d.kind==='TOOL')f1On=true; }
+      });
+      scoreEl.textContent = resolved? (resolved===N?String(FINAL):String(Math.round(sum/resolved))) : '..';
+      scoreEl.style.color = RED;
+      f1El.textContent = f1On?'0.42':'..'; f1El.style.color = f1On?RED:MUTE;
+      loopEl.textContent = lastLoop==null?'..':String(lastLoop); loopEl.style.color = lastLoop==null?MUTE:(lastLoop>=100?GREEN:AMBER);
+      stepsEl.textContent = resolved+'/'+N;
+      if(capEl) capEl.textContent = resolved===N?'capped at 59 · critical fail':'streaming the run live';
+    }
+    function tick(now){ render(now); raf=requestAnimationFrame(tick); }
+    function start(){ if(!raf) raf=requestAnimationFrame(tick); }
+    function stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+    const rb=$('heroReplay'); if(rb) rb.addEventListener('click', ()=>{ t0=performance.now(); if(!MOTION) render(t0); });
+    if(!MOTION){ t0=performance.now()-(CYCLE-HOLD+1); render(performance.now()); return; }  // show the settled run, no loop
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(es=>es.forEach(e=> e.isIntersecting?start():stop()), {threshold:.25}).observe(panel);
+    } else start();
+  })();
 
   /* ============================= PLAYGROUND ============================= */
   async function sseStream(url, body, onEvent) {
